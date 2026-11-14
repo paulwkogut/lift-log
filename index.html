@@ -903,6 +903,17 @@
       letter-spacing: -0.04em;
     }
     .rest-flash p { margin: 12px 0 0; font-size: 18px; font-weight: 750; }
+    .rest-stop {
+      margin-top: 22px;
+      min-width: 148px;
+      min-height: 52px;
+      padding: 0 22px;
+      border-radius: 14px;
+      background: var(--accent-ink);
+      color: var(--accent);
+      font-weight: 800;
+      font-size: 17px;
+    }
     @keyframes restPulse {
       0%, 100% { background: var(--accent); }
       50% { background: color-mix(in srgb, var(--accent) 68%, white); }
@@ -1076,9 +1087,39 @@
       border-radius: var(--radius);
       padding: 12px 12px 10px;
       margin-bottom: 12px;
+      scroll-margin-top: calc(76px + var(--safe-t));
     }
     .wo-ex-name { font-weight: 750; font-size: 17px; letter-spacing: -0.02em; }
     .wo-last { color: var(--muted); font-size: 13px; margin-top: 2px; }
+    .wo-block.skipped { opacity: 0.62; }
+    .wo-block.skipped .wo-ex-name {
+      text-decoration: line-through;
+      color: var(--muted);
+    }
+    .skip-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+    .skip-btn {
+      flex-shrink: 0;
+      min-height: 36px;
+      padding: 0 12px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: var(--surface-2);
+      color: var(--text);
+      font-weight: 750;
+      font-size: 13px;
+    }
+    .wo-block.skipped .skip-btn {
+      color: var(--accent-2);
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
     .wo-logger { margin: 10px 0 0; box-shadow: none; padding: 12px; }
     .wo-logger .stepper input { font-size: 32px; height: 44px; }
     .session-set { color: var(--muted); font-size: 13px; margin-top: 8px; }
@@ -1389,10 +1430,13 @@
     let templatesMode = "local";
     let targetsColumn = true;
     let activeWorkout = null;
+    let focusWorkoutId = "";
     let workoutDrafts = {};
     let planDrafts = {};
     let restSession = null;
     let restTick = 0;
+    let restBeepTimer = 0;
+    let restBeepUntil = 0;
     let restAlerted = false;
     let audioCtx = null;
     const THEME_KEY = "lift-log-theme-v1";
@@ -2131,6 +2175,11 @@
         window.scrollTo(0, scrollY);
       }
       syncScreenLock();
+      if (focusWorkoutId) {
+        const target = document.getElementById("wo-" + focusWorkoutId);
+        focusWorkoutId = "";
+        if (target && target.scrollIntoView) target.scrollIntoView({ block: "start" });
+      }
     }
 
     function hydrateAuthFields() {
@@ -3099,6 +3148,7 @@
       if (action === "tpl-add-existing") return pickExistingExercise(el.getAttribute("data-name"));
       if (action === "tpl-add-named") return addNamedFromPicker();
       if (action === "wo-skip") return skipWorkoutExercise(el.getAttribute("data-id"));
+      if (action === "wo-unskip") return unskipWorkoutExercise(el.getAttribute("data-id"));
       if (action === "tpl-target") return changeTemplateTarget(el);
       if (action === "log-plan") return logPlannedSet(el.getAttribute("data-id"), parseInt(el.getAttribute("data-index"), 10));
       if (action === "wo-extra-set") return addExtraSet(el.getAttribute("data-id"));
@@ -3616,6 +3666,7 @@
           item.sets = clampTarget(item.sets, 1, 20, 3);
           item.reps = clampTarget(item.reps, 1, 100, 10);
           item.extra = clampTarget(item.extra, 0, 30, 0);
+          item.skipped = !!item.skipped;
         });
         activeWorkout = data;
       } catch {
@@ -3811,7 +3862,7 @@
           <h1>${escapeHtml(activeWorkout.name)}</h1>
         </header>
         <main class="screen">
-          <div class="wo-progress">${progress.done}/${progress.total} sets</div>
+          <div class="wo-progress">${escapeHtml(progress.label)}</div>
           ${blocks || `<div class="empty">No exercises left in this workout.</div>`}
           <button type="button" class="add-ex" data-action="wo-add-open" style="margin-top:4px">+ Add exercise</button>
           <div class="finish-bar">
@@ -3998,6 +4049,12 @@
       persistActive();
       cacheTemplates();
       screenLockHold = false;
+      stopRestBeeps();
+      restSession = null;
+      restAlerted = false;
+      clearInterval(restTick);
+      persistRestSession();
+      enqueueRestPush({ action: "cancel" });
       showToast("Workout finished");
       go("#/");
     }
@@ -4162,15 +4219,22 @@
       return prior.filter(s => todayKey(s.createdAt) === day);
     }
     function workoutProgress(items) {
-      let done = 0;
-      let total = 0;
-      (items || workoutItems()).forEach(item => {
+      const list = items || workoutItems();
+      let completed = 0;
+      let skipped = 0;
+      list.forEach(item => {
+        if (item.skipped) {
+          skipped += 1;
+          completed += 1;
+          return;
+        }
         const planned = item.sets + (item.extra || 0);
         const logged = sessionSetsFor(item.exerciseId).length;
-        done += Math.min(logged, planned);
-        total += planned;
+        if (planned > 0 && logged >= planned) completed += 1;
       });
-      return { done, total };
+      let label = completed + " of " + list.length + " done";
+      if (skipped) label += ", " + skipped + " skipped";
+      return { done: completed, total: list.length, skipped, label };
     }
     function planKey(exId, index) { return exId + ":" + index; }
     function ensurePlan(exId, index, fallbackReps) {
@@ -4240,13 +4304,14 @@
     function restSheetHtml() {
       if (!restSession) return "";
       if (restSession.phase === "done") {
-        return `<button type="button" class="rest-flash" id="rest-flash" data-action="rest-skip" aria-label="Rest over - next set">
+        return `<div class="rest-flash" id="rest-flash" role="alertdialog" aria-label="Rest over - next set">
           <div>
             <div class="rest-kicker">REST OVER</div>
             <h2>Rest over - next set</h2>
-            <p>Tap to continue</p>
+            <p>${restSettings.sound === false ? "Log the next set when you're ready." : "The beep repeats until you log the next set."}</p>
+            <button type="button" class="rest-stop" data-action="rest-skip">Stop</button>
           </div>
-        </button>`;
+        </div>`;
       }
       const left = Math.ceil(restRemainingMs() / 1000);
       const paused = restSession.phase === "pause";
@@ -4285,6 +4350,36 @@
       if (restSettings.sound === false) return;
       ensureAudioCtx();
     }
+    function stopRestBeeps() {
+      clearInterval(restBeepTimer);
+      restBeepTimer = 0;
+      restBeepUntil = 0;
+    }
+    function playRestBeepOnce() {
+      const ctx = audioCtx;
+      if (!ctx || restSettings.sound === false) return;
+      const run = () => { try { playBeep(); } catch {} };
+      if (ctx.state === "suspended") {
+        try {
+          const resumed = ctx.resume();
+          if (resumed && resumed.then) resumed.then(run).catch(() => {});
+          else run();
+        } catch {}
+      } else run();
+    }
+    function startRestBeeps() {
+      stopRestBeeps();
+      if (restSettings.sound === false) return;
+      if (!restSession || restSession.phase !== "done" || restSession.repeat === false) return;
+      restBeepUntil = Date.now() + 3 * 60 * 1000;
+      restBeepTimer = setInterval(() => {
+        if (!restSession || restSession.phase !== "done" || restSettings.sound === false || Date.now() >= restBeepUntil) {
+          stopRestBeeps();
+          return;
+        }
+        playRestBeepOnce();
+      }, 2000);
+    }
     function playBeep() {
       const ctx = audioCtx;
       if (!ctx) return;
@@ -4304,7 +4399,7 @@
         osc.stop(t0 + 0.24);
       });
     }
-    async function fireRestAlert() {
+    async function fireRestAlert(once) {
       if (restAlerted) return;
       restAlerted = true;
       try { if (navigator.vibrate) navigator.vibrate([220, 90, 220, 90, 220]); } catch {}
@@ -4317,6 +4412,7 @@
           new Notification("Lift Log", { body: "Rest over - next set" });
         }
       } catch {}
+      if (!once) startRestBeeps();
     }
     function completeRest() {
       if (!restSession || restSession.phase === "done") return;
@@ -4461,7 +4557,8 @@
           endsAt: restSession.endsAt || 0,
           remaining: restSession.remaining || 0,
           name: restSession.name || "",
-          pendingAlert: !!restSession.pendingAlert
+          pendingAlert: !!restSession.pendingAlert,
+          repeat: restSession.repeat !== false
         }));
       } catch {}
     }
@@ -4479,7 +4576,8 @@
           endsAt,
           remaining: Number(raw.remaining) || 0,
           name: raw.name || "",
-          pendingAlert: !!raw.pendingAlert
+          pendingAlert: !!raw.pendingAlert,
+          repeat: raw.repeat !== false
         };
         if (restSession.phase === "run" && endsAt && Date.now() >= endsAt) {
           restSession.phase = "done";
@@ -4565,7 +4663,16 @@
       }
     }
     function maybeStartRest(name) {
-      if (!restSettings.auto) return;
+      stopRestBeeps();
+      if (!restSettings.auto) {
+        if (restSession && restSession.phase === "done") {
+          restSession = null;
+          restAlerted = false;
+          clearInterval(restTick);
+          persistRestSession();
+        }
+        return;
+      }
       const seconds = restSecondsFor(name);
       restAlerted = false;
       restSession = { phase: "run", endsAt: Date.now() + seconds * 1000, remaining: seconds * 1000, name: name || "" };
@@ -4574,6 +4681,7 @@
       enqueueRestPush({ action: "schedule", fireAt: restSession.endsAt, exerciseName: restSession.name });
     }
     function clearRest() {
+      stopRestBeeps();
       restSession = null;
       restAlerted = false;
       clearInterval(restTick);
@@ -4628,16 +4736,18 @@
       render();
     }
     function testRestAlert() {
+      stopRestBeeps();
       if (restSettings.sound !== false) ensureAudioCtx();
       restAlerted = false;
-      restSession = { phase: "done", name: "" };
+      restSession = { phase: "done", name: "", repeat: false };
       persistRestSession();
       enqueueRestPush({ action: "cancel" });
-      fireRestAlert();
+      fireRestAlert(true);
       render();
     }
     function setRestSound(on) {
       restSettings.sound = !!on;
+      if (!on) stopRestBeeps();
       saveRestSettings();
       render();
     }
@@ -4651,6 +4761,17 @@
       const id = item.exerciseId;
       const ex = exerciseById(id);
       const name = ex ? ex.name : "Missing exercise";
+      if (item.skipped) {
+        return `<section class="wo-block skipped" id="wo-${escapeHtml(id)}">
+          <div class="wo-block-head">
+            <div>
+              <div class="wo-ex-name">${escapeHtml(name)}</div>
+              <div class="skip-label">Skipped</div>
+            </div>
+            <button type="button" class="skip-btn" data-action="wo-unskip" data-id="${escapeHtml(id)}">Unskip</button>
+          </div>
+        </section>`;
+      }
       const planned = item.sets + (item.extra || 0);
       const logged = sessionSetsFor(id);
       const rows = [];
@@ -4674,13 +4795,13 @@
         </div>`);
       }
       const doneCount = Math.min(logged.length, planned);
-      return `<section class="wo-block">
+      return `<section class="wo-block" id="wo-${escapeHtml(id)}">
         <div class="wo-block-head">
           <div>
             <div class="wo-ex-name">${escapeHtml(name)}</div>
             <div class="wo-last">${doneCount}/${planned} sets</div>
           </div>
-          <button type="button" class="icon-x" data-action="wo-skip" data-id="${escapeHtml(id)}" aria-label="Skip ${escapeHtml(name)}">×</button>
+          <button type="button" class="skip-btn" data-action="wo-skip" data-id="${escapeHtml(id)}" aria-label="Skip ${escapeHtml(name)}">Skip</button>
         </div>
         ${rows.join("")}
         <button type="button" class="add-extra" data-action="wo-extra-set" data-id="${escapeHtml(id)}">+ Add set</button>
@@ -4689,6 +4810,8 @@
     async function logPlannedSet(exId, index) {
       armRestAudio();
       if (saving || !activeWorkout || !Number.isFinite(index)) return;
+      const plannedItem = workoutItems().find(item => item.exerciseId === exId);
+      if (plannedItem && plannedItem.skipped) return;
       const logged = sessionSetsFor(exId);
       if (logged.length !== index) return;
       const draft = readPlan(exId, index);
@@ -4726,16 +4849,42 @@
       const items = workoutItems();
       if (!activeWorkout.items) activeWorkout.items = items;
       const item = activeWorkout.items.find(i => i.exerciseId === exId);
-      if (!item) return;
+      if (!item || item.skipped) return;
       item.extra = clampTarget((item.extra || 0) + 1, 0, 30, 0);
       persistActive();
       render();
     }
+    function workoutItem(id) {
+      if (!activeWorkout || !id) return null;
+      const items = workoutItems();
+      if (!activeWorkout.items) activeWorkout.items = items;
+      return activeWorkout.items.find(item => item.exerciseId === id) || null;
+    }
+    function nextWorkoutFocus(id) {
+      const items = workoutItems();
+      const idx = items.findIndex(item => item.exerciseId === id);
+      const next = items.slice(Math.max(0, idx + 1)).find(item => !item.skipped);
+      return next ? next.exerciseId : "";
+    }
     function skipWorkoutExercise(id) {
-      if (!activeWorkout || !id) return;
-      const items = workoutItems().filter(item => item.exerciseId !== id);
-      activeWorkout.items = items;
-      activeWorkout.exerciseIds = items.map(item => item.exerciseId);
+      const item = workoutItem(id);
+      if (!item || item.skipped) return;
+      item.skipped = true;
+      const ex = exerciseById(id);
+      const name = ex ? ex.name : "";
+      focusWorkoutId = nextWorkoutFocus(id);
+      persistActive();
+      if (restSession && name && String(restSession.name || "").toLowerCase() === name.toLowerCase()) {
+        clearRest();
+        return;
+      }
+      render();
+    }
+    function unskipWorkoutExercise(id) {
+      const item = workoutItem(id);
+      if (!item || !item.skipped) return;
+      item.skipped = false;
+      focusWorkoutId = id;
       persistActive();
       render();
     }
