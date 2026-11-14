@@ -465,7 +465,7 @@
     .toast {
       position: fixed;
       left: 50%;
-      bottom: calc(28px + var(--safe-b));
+      bottom: calc(96px + var(--safe-b));
       transform: translateX(-50%);
       background: #f4f1ec;
       color: #16140f;
@@ -579,6 +579,100 @@
       .spinner { animation: none; }
     }
 
+    .wo-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+    .wo-card {
+      display: flex;
+      align-items: stretch;
+      gap: 4px;
+      width: 100%;
+      text-align: left;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 6px 6px 6px 14px;
+      min-height: 84px;
+    }
+    .wo-card.next {
+      border-color: var(--accent);
+      background: linear-gradient(180deg, rgba(255, 106, 42, 0.18), var(--surface) 58%);
+    }
+    .wo-start { flex: 1; min-width: 0; text-align: left; padding: 8px 4px; }
+    .wo-start .kicker {
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 750;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .wo-start .nm {
+      display: block;
+      font-size: 18px;
+      font-weight: 750;
+      letter-spacing: -0.03em;
+      margin-top: 2px;
+    }
+    .wo-start .sub {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .wo-card .mini { align-self: center; }
+    .resume-bar {
+      width: 100%;
+      min-height: 52px;
+      margin-bottom: 8px;
+      border-radius: 14px;
+      background: var(--accent);
+      color: #1a0a00;
+      font-weight: 800;
+    }
+    .new-template { margin: 4px 0 18px; }
+    .wo-block {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 12px 12px 10px;
+      margin-bottom: 12px;
+    }
+    .wo-ex-name { font-weight: 750; font-size: 17px; letter-spacing: -0.02em; }
+    .wo-last { color: var(--muted); font-size: 13px; margin-top: 2px; }
+    .wo-logger { margin: 10px 0 0; box-shadow: none; padding: 12px; }
+    .wo-logger .stepper input { font-size: 32px; height: 44px; }
+    .session-set { color: var(--muted); font-size: 13px; margin-top: 8px; }
+    .finish-bar {
+      position: sticky;
+      bottom: 0;
+      margin: 8px -16px 0;
+      padding: 12px 16px calc(8px + var(--safe-b));
+      background: linear-gradient(180deg, transparent, var(--bg) 28%);
+    }
+    .tpl-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 8px 8px 8px 14px;
+      margin-bottom: 6px;
+      min-height: 52px;
+    }
+    .tpl-row .name { flex: 1; min-width: 0; font-weight: 650; }
+    .pick-list { display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow: auto; margin-bottom: 12px; }
+    .pick-list button {
+      text-align: left;
+      min-height: 48px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      font-weight: 650;
+    }
+
   </style>
 </head>
 <body>
@@ -594,6 +688,20 @@
       "Bench Press", "Squat", "Deadlift", "Overhead Press",
       "Barbell Row", "Pull-up", "Lat Pulldown", "Dumbbell Curl", "Leg Press"
     ];
+    // "Deadlift or Barbell Row" and "Pull-up / Lat Pulldown" use an existing
+    // exercise when one of the pair is already in the account.
+    const BUILTIN_TEMPLATES = [
+      { kind: "push", name: "Push", position: 0, names: ["Bench Press", "Overhead Press", "Incline Dumbbell Press", "Lateral Raise", "Triceps Pushdown"] },
+      { kind: "pull", name: "Pull", position: 1, names: ["Deadlift", "Pull-up", "Seated Cable Row", "Face Pull", "Biceps Curl"] },
+      { kind: "legs", name: "Legs", position: 2, names: ["Squat", "Romanian Deadlift", "Leg Press", "Leg Curl", "Calf Raise"] }
+    ];
+    const ROTATION = ["push", "pull", "legs"];
+    const NAME_ALIASES = {
+      "deadlift": ["Barbell Row"],
+      "barbell row": ["Deadlift"],
+      "pull-up": ["Lat Pulldown"],
+      "lat pulldown": ["Pull-up"]
+    };
 
     const appEl = document.getElementById("app");
     if (!window.supabase || typeof window.supabase.createClient !== "function") {
@@ -640,9 +748,19 @@
     let accountLoad = null;
     let saving = false;
     let focusAuthField = "";
+    let templatesMode = "local";
+    let activeWorkout = null;
+    let workoutDrafts = {};
 
     function blankState() {
-      return { version: 2, settings: { unit: "lbs" }, exercises: [], sets: [] };
+      return {
+        version: 2,
+        settings: { unit: "lbs" },
+        exercises: [],
+        sets: [],
+        templates: [],
+        lastTemplateId: null
+      };
     }
 
     function statusBlock(message, spinning) {
@@ -699,6 +817,9 @@
       if (isAuthHash(raw)) return { name: "home" };
       const h = raw.replace(/^#/, "") || "/";
       if (h === "/settings") return { name: "settings" };
+      if (h === "/workout") return { name: "workout" };
+      const tm = h.match(/^\/template\/([^/]+)$/);
+      if (tm) return { name: "template", id: decodeURIComponent(tm[1]) };
       const m = h.match(/^\/exercise\/([^/]+)$/);
       if (m) return { name: "exercise", id: decodeURIComponent(m[1]) };
       return { name: "home" };
@@ -838,6 +959,8 @@
     }
 
     function applyServerState(exercises, sets, settings) {
+      const templates = state.templates || [];
+      const lastTemplateId = state.lastTemplateId || null;
       state = {
         version: 2,
         settings: { unit: settings && settings.unit === "kg" ? "kg" : "lbs" },
@@ -853,7 +976,9 @@
           weightLbs: toLbsFrom(s.weight, s.unit),
           reps: parseInt(s.reps, 10),
           createdAt: new Date(s.performed_at).getTime()
-        }))
+        })),
+        templates,
+        lastTemplateId
       };
     }
 
@@ -917,6 +1042,8 @@
         }
         if (seq !== loadSeq) return;
         applyServerState(pack.exercises, pack.sets, pack.settings);
+        await loadTemplates();
+        if (seq !== loadSeq) return;
         dataReadyFor = uid;
         loading = false;
         bootError = "";
@@ -1135,6 +1262,9 @@
         recoveryMode = false;
         dataReadyFor = null;
         state = blankState();
+        activeWorkout = null;
+        workoutDrafts = {};
+        templatesMode = "local";
         modal = null;
         draft = { weight: "", reps: "" };
         draftExId = null;
@@ -1213,6 +1343,8 @@
       if (bootError) return "error";
       if (route.name === "settings") return "settings";
       if (route.name === "exercise") return "exercise";
+      if (route.name === "workout") return "workout";
+      if (route.name === "template") return "template";
       return "home";
     }
 
@@ -1231,6 +1363,8 @@
       else if (screen === "error") html = renderBootError();
       else if (screen === "settings") html = renderSettings();
       else if (screen === "exercise") html = renderExercise();
+      else if (screen === "workout") html = renderWorkout();
+      else if (screen === "template") html = renderTemplateEditor();
       else html = renderHome();
 
       const showModal = screen !== "auth" && screen !== "loading" && screen !== "recovery" && screen !== "error";
@@ -1384,6 +1518,7 @@
           <button class="icon-btn" data-go="#/settings" aria-label="Settings">${gearIcon()}</button>
         </header>
         <main class="screen">
+          ${renderWorkoutSection()}
           <div class="eyebrow">Exercises</div>
           <div class="ex-list">${rows || `<div class="empty">No exercises yet. Add one to start logging.</div>`}</div>
           <div class="add-ex-wrap">
@@ -1563,6 +1698,39 @@
 
     function renderModal() {
       if (!modal) return "";
+      if (modal.type === "new-template") {
+        return `<div class="overlay" data-action="close-modal">
+          <div class="sheet" role="dialog" aria-modal="true" aria-label="New template">
+            <div class="grab"></div>
+            <h2>New template</h2>
+            <label class="field-lbl" for="tpl-new-name">Name</label>
+            <input class="text-input" id="tpl-new-name" maxlength="40" value="${escapeHtml(modal.value || "")}" placeholder="e.g. Arms">
+            <div class="sheet-actions">
+              <button class="btn ghost" data-action="close-modal">Cancel</button>
+              <button class="btn primary" data-action="save-new-template">Create</button>
+            </div>
+          </div>
+        </div>`;
+      }
+      if (modal.type === "add-template-exercise") {
+        const t = templateById(modal.id);
+        const have = new Set((t ? t.exerciseNames : []).map(n => n.toLowerCase()));
+        const picks = state.exercises.filter(e => !have.has(e.name.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name));
+        const list = picks.map(e => `<button type="button" data-action="tpl-add-existing" data-id="${escapeHtml(modal.id)}" data-name="${escapeHtml(e.name)}">${escapeHtml(e.name)}</button>`).join("");
+        return `<div class="overlay" data-action="close-modal">
+          <div class="sheet" role="dialog" aria-modal="true" aria-label="Add exercise">
+            <div class="grab"></div>
+            <h2>Add exercise</h2>
+            <div class="pick-list">${list || `<div class="empty">No other exercises yet.</div>`}</div>
+            <label class="field-lbl" for="tpl-add-name">Or a new name</label>
+            <input class="text-input" id="tpl-add-name" maxlength="60" value="${escapeHtml(modal.value || "")}" placeholder="e.g. Face Pull">
+            <div class="sheet-actions">
+              <button class="btn ghost" data-action="close-modal">Cancel</button>
+              <button class="btn primary" data-action="tpl-add-named" data-id="${escapeHtml(modal.id)}">Add</button>
+            </div>
+          </div>
+        </div>`;
+      }
       if (modal.type === "add-exercise" || modal.type === "rename-exercise") {
         const title = modal.type === "add-exercise" ? "New exercise" : "Rename exercise";
         const val = modal.value || "";
@@ -1769,6 +1937,20 @@
       const dr = document.getElementById("draft-reps");
       if (dw) dw.addEventListener("input", () => { draft.weight = dw.value; });
       if (dr) dr.addEventListener("input", () => { draft.reps = dr.value; });
+      document.querySelectorAll("[data-draft-weight]").forEach(input => {
+        input.addEventListener("input", () => {
+          const id = input.getAttribute("data-draft-weight");
+          readWorkoutDraft(id);
+        });
+      });
+      document.querySelectorAll("[data-draft-reps]").forEach(input => {
+        input.addEventListener("input", () => {
+          const id = input.getAttribute("data-draft-reps");
+          readWorkoutDraft(id);
+        });
+      });
+      const tplName = document.getElementById("tpl-name");
+      if (tplName) tplName.addEventListener("change", () => saveTemplateName());
 
       const authFormEl = document.getElementById("auth-form");
       if (authFormEl) authFormEl.addEventListener("submit", (e) => {
@@ -1879,6 +2061,27 @@
       if (action === "export-json") return exportJson();
       if (action === "import-json") return chooseImportFile();
       if (action === "do-import") return doImport();
+      if (action === "start-template") return startTemplate(el.getAttribute("data-id"));
+      if (action === "resume-workout") return go("#/workout");
+      if (action === "edit-template") return go("#/template/" + encodeURIComponent(el.getAttribute("data-id")));
+      if (action === "new-template") {
+        modal = { type: "new-template", value: "" };
+        return render();
+      }
+      if (action === "save-new-template") return saveNewTemplate();
+      if (action === "save-template-name") return saveTemplateName();
+      if (action === "tpl-move") return moveTemplateExercise(el.getAttribute("data-id"), el.getAttribute("data-index"), el.getAttribute("data-dir"));
+      if (action === "tpl-remove") return removeTemplateExercise(el.getAttribute("data-id"), el.getAttribute("data-index"));
+      if (action === "tpl-add-open") {
+        modal = { type: "add-template-exercise", id: el.getAttribute("data-id"), value: "" };
+        return render();
+      }
+      if (action === "tpl-add-existing") return addTemplateExercise(el.getAttribute("data-id"), el.getAttribute("data-name"));
+      if (action === "tpl-add-named") return addNamedTemplateExercise(el.getAttribute("data-id"));
+      if (action === "delete-template") return deleteTemplate(el.getAttribute("data-id"));
+      if (action === "wo-step-w" || action === "wo-step-r") return stepWorkout(action, el);
+      if (action === "wo-add-set") return addWorkoutSet(el.getAttribute("data-id"));
+      if (action === "finish-workout") return finishWorkout();
     }
 
     async function submitAuth() {
@@ -2195,6 +2398,554 @@
         render();
       }
     }
+
+    function templatesCacheKey() {
+      return "lift-log-templates:" + (session && session.user ? session.user.id : "");
+    }
+    function lastTemplateKey() {
+      return "lift-log-last-template:" + (session && session.user ? session.user.id : "");
+    }
+    function templatesSeedKey() {
+      return "lift-log-templates-seeded:" + (session && session.user ? session.user.id : "");
+    }
+    function activeWorkoutKey() {
+      return "lift-log-active-workout:" + (session && session.user ? session.user.id : "");
+    }
+    function isMissingSchema(error) {
+      if (!error) return false;
+      const code = String(error.code || "");
+      const msg = String(error.message || "").toLowerCase();
+      if (code === "42P01" || code === "42703" || code === "PGRST205" || code === "PGRST204") return true;
+      return msg.includes("does not exist") || msg.includes("could not find") || msg.includes("schema cache");
+    }
+    function builtinTemplateRecords() {
+      return BUILTIN_TEMPLATES.map(t => ({
+        id: "local-" + t.kind,
+        name: t.name,
+        kind: t.kind,
+        position: t.position,
+        exerciseNames: t.names.slice()
+      }));
+    }
+    function readTemplateCache() {
+      try {
+        const raw = localStorage.getItem(templatesCacheKey());
+        if (!raw) return null;
+        const data = JSON.parse(raw);
+        if (!data || !Array.isArray(data.templates)) return null;
+        return data;
+      } catch {
+        return null;
+      }
+    }
+    function cacheTemplates() {
+      if (!session || !session.user) return;
+      localStorage.setItem(templatesCacheKey(), JSON.stringify({
+        seeded: true,
+        templates: state.templates,
+        lastTemplateId: state.lastTemplateId || null
+      }));
+    }
+    function useLocalTemplates() {
+      templatesMode = "local";
+      const cached = readTemplateCache();
+      state.templates = cached ? cached.templates : builtinTemplateRecords();
+      state.lastTemplateId = (cached && cached.lastTemplateId) || localStorage.getItem(lastTemplateKey()) || null;
+      restoreActive();
+    }
+    function rowToTemplate(row) {
+      const names = Array.isArray(row.exercise_names) ? row.exercise_names : [];
+      return {
+        id: row.id,
+        name: row.name,
+        kind: row.kind || "custom",
+        position: row.position || 0,
+        exerciseNames: names.map(n => String(n))
+      };
+    }
+    function templateById(id) {
+      return (state.templates || []).find(t => t.id === id);
+    }
+    function suggestedTemplate() {
+      const last = templateById(state.lastTemplateId);
+      const lastKind = last && ROTATION.indexOf(last.kind) !== -1 ? last.kind : null;
+      const nextKind = lastKind ? ROTATION[(ROTATION.indexOf(lastKind) + 1) % ROTATION.length] : "push";
+      return (state.templates || []).find(t => t.kind === nextKind) || null;
+    }
+    function restoreActive() {
+      try {
+        const raw = localStorage.getItem(activeWorkoutKey());
+        if (!raw) { activeWorkout = null; return; }
+        const data = JSON.parse(raw);
+        if (!data || !Array.isArray(data.exerciseIds) || !data.exerciseIds.length) {
+          activeWorkout = null;
+          return;
+        }
+        activeWorkout = data;
+      } catch {
+        activeWorkout = null;
+      }
+    }
+    function persistActive() {
+      if (!activeWorkout) localStorage.removeItem(activeWorkoutKey());
+      else localStorage.setItem(activeWorkoutKey(), JSON.stringify(activeWorkout));
+    }
+    async function loadTemplates() {
+      try {
+        const res = await sb.from("templates").select("id,name,kind,position,exercise_names").order("position", { ascending: true });
+        if (res.error) {
+          console.warn(res.error);
+          if (!(state.templates || []).length || isMissingSchema(res.error)) useLocalTemplates();
+          return;
+        }
+        templatesMode = "remote";
+        let rows = res.data || [];
+        if (!rows.length && !localStorage.getItem(templatesSeedKey())) {
+          const flag = await sb.from("user_settings").select("templates_seeded").maybeSingle();
+          const already = !flag.error && flag.data && flag.data.templates_seeded;
+          if (!already) {
+            const cached = readTemplateCache();
+            const source = cached && cached.templates && cached.templates.length ? cached.templates : null;
+            rows = await seedRemoteTemplates(source);
+          }
+        }
+        state.templates = rows.map(rowToTemplate).sort((a, b) => a.position - b.position || a.name.localeCompare(b.name));
+        const lastRes = await sb.from("user_settings").select("last_template_id").maybeSingle();
+        state.lastTemplateId = (lastRes.data && lastRes.data.last_template_id) || localStorage.getItem(lastTemplateKey()) || null;
+        cacheTemplates();
+        restoreActive();
+      } catch (err) {
+        console.warn(err);
+        if (!(state.templates || []).length) useLocalTemplates();
+      }
+    }
+    async function seedRemoteTemplates(source) {
+      const list = source && source.length ? source : builtinTemplateRecords();
+      const idMap = {};
+      const rows = list.map((t, i) => {
+        const id = uid();
+        if (t.id) idMap[t.id] = id;
+        const kind = ROTATION.indexOf(t.kind) === -1 ? "custom" : t.kind;
+        return {
+          id,
+          user_id: session.user.id,
+          name: t.name,
+          kind,
+          position: t.position != null ? t.position : i,
+          exercise_names: t.exerciseNames || t.names || []
+        };
+      });
+      const ins = await sb.from("templates").insert(rows);
+      if (ins.error && ins.error.code !== "23505") console.warn(ins.error);
+      if (state.lastTemplateId && idMap[state.lastTemplateId]) {
+        state.lastTemplateId = idMap[state.lastTemplateId];
+        localStorage.setItem(lastTemplateKey(), state.lastTemplateId);
+      }
+      const again = await sb.from("templates").select("id,name,kind,position,exercise_names").order("position", { ascending: true });
+      if (again.error) return [];
+      if ((again.data && again.data.length) || (ins.error && ins.error.code === "23505")) {
+        localStorage.setItem(templatesSeedKey(), "1");
+        await sb.from("user_settings").update({ templates_seeded: true }).eq("user_id", session.user.id);
+      }
+      return again.data || [];
+    }
+    async function saveTemplateRecord(t) {
+      const names = t.exerciseNames.map(n => String(n).trim()).filter(Boolean).slice(0, 20);
+      t.exerciseNames = names;
+      if (templatesMode === "remote" && String(t.id).indexOf("local-") !== 0) {
+        const res = await sb.from("templates").update({
+          name: t.name,
+          kind: t.kind,
+          position: t.position,
+          exercise_names: names
+        }).eq("id", t.id);
+        if (res.error) {
+          if (!isMissingSchema(res.error)) throw asError(res.error, "Couldn't save that template.");
+          templatesMode = "local";
+        }
+      }
+      cacheTemplates();
+    }
+    function findExistingExercise(name) {
+      const wanted = String(name || "").trim().toLowerCase();
+      if (!wanted) return null;
+      const exact = state.exercises.find(e => e.name.toLowerCase() === wanted);
+      if (exact) return exact;
+      const aliases = NAME_ALIASES[wanted] || [];
+      for (const alias of aliases) {
+        const hit = state.exercises.find(e => e.name.toLowerCase() === alias.toLowerCase());
+        if (hit) return hit;
+      }
+      return null;
+    }
+    async function ensureExercise(name) {
+      const existing = findExistingExercise(name);
+      if (existing) return existing;
+      const clean = String(name || "").trim().slice(0, 60);
+      if (!clean) throw new Error("Give the exercise a name");
+      const ex = {
+        id: uid(),
+        name: clean,
+        custom: DEFAULT_NAMES.indexOf(clean) === -1,
+        createdAt: Date.now()
+      };
+      await persistExerciseInsert(ex);
+      state.exercises.push(ex);
+      return ex;
+    }
+    function templateLabel(t) {
+      return (t.exerciseNames || []).map(name => {
+        const existing = findExistingExercise(name);
+        return existing ? existing.name : name;
+      }).join(" · ");
+    }
+    function renderWorkoutSection() {
+      const templates = state.templates || [];
+      const next = suggestedTemplate();
+      const cards = templates.map(t => {
+        const isNext = next && next.id === t.id;
+        return `<article class="wo-card${isNext ? " next" : ""}">
+          <button type="button" class="wo-start" data-action="start-template" data-id="${escapeHtml(t.id)}" aria-label="Start ${escapeHtml(t.name)}">
+            ${isNext ? '<span class="kicker">Next</span>' : ""}
+            <span class="nm">${escapeHtml(t.name)}</span>
+            <span class="sub">${escapeHtml(templateLabel(t) || "No exercises yet")}</span>
+          </button>
+          <button type="button" class="mini" data-action="edit-template" data-id="${escapeHtml(t.id)}" aria-label="Edit ${escapeHtml(t.name)}">Edit</button>
+        </article>`;
+      }).join("");
+      const resume = activeWorkout
+        ? `<button type="button" class="resume-bar" data-action="resume-workout">Resume ${escapeHtml(activeWorkout.name)}</button>`
+        : "";
+      return `<div class="eyebrow">Start workout</div>
+        ${resume}
+        <div class="wo-list">${cards || `<div class="empty">No templates yet.</div>`}</div>
+        <button type="button" class="add-ex new-template" data-action="new-template">+ New template</button>`;
+    }
+    function renderWorkout() {
+      if (!activeWorkout) {
+        return `<header class="topbar">
+          <button class="icon-btn" data-go="#/" aria-label="Back">${backIcon()}</button>
+          <h1>Workout</h1>
+        </header>
+        <main class="screen"><div class="empty">No workout in progress.</div>
+        <button class="add-ex" data-go="#/">Back to list</button></main>`;
+      }
+      const blocks = activeWorkout.exerciseIds.map(id => {
+        const ex = exerciseById(id);
+        const name = ex ? ex.name : "Missing exercise";
+        ensureWorkoutDraft(id);
+        const d = workoutDrafts[id];
+        const prior = setsFor(id).filter(s => s.createdAt < activeWorkout.startedAt);
+        const last = prior.length ? prior[prior.length - 1] : null;
+        const lastTxt = last ? `Last: ${fmtWeight(last.weightLbs, true)} × ${last.reps}` : "No sets yet";
+        const sessionSets = setsFor(id).filter(s => s.createdAt >= activeWorkout.startedAt);
+        const logged = sessionSets.map(s => `${fmtWeight(s.weightLbs, true)} × ${s.reps}`).join(" · ");
+        return `<section class="wo-block">
+          <div class="wo-ex-name">${escapeHtml(name)}</div>
+          <div class="wo-last">${escapeHtml(lastTxt)}</div>
+          <div class="logger wo-logger">
+            <div class="logger-grid">
+              <div class="stepper">
+                <div class="unit-lbl">Weight (${unit()})</div>
+                <input id="wo-w-${escapeHtml(id)}" data-draft-weight="${escapeHtml(id)}" inputmode="decimal" type="text" value="${escapeHtml(d.weight)}" aria-label="Weight for ${escapeHtml(name)}">
+                <div class="step-row">
+                  <button type="button" class="step-btn" data-action="wo-step-w" data-id="${escapeHtml(id)}" data-dir="-1" aria-label="Decrease weight for ${escapeHtml(name)}">−</button>
+                  <button type="button" class="step-btn" data-action="wo-step-w" data-id="${escapeHtml(id)}" data-dir="1" aria-label="Increase weight for ${escapeHtml(name)}">+</button>
+                </div>
+              </div>
+              <div class="stepper">
+                <div class="unit-lbl">Reps</div>
+                <input id="wo-r-${escapeHtml(id)}" data-draft-reps="${escapeHtml(id)}" inputmode="numeric" type="text" value="${escapeHtml(d.reps)}" aria-label="Reps for ${escapeHtml(name)}">
+                <div class="step-row">
+                  <button type="button" class="step-btn" data-action="wo-step-r" data-id="${escapeHtml(id)}" data-dir="-1" aria-label="Decrease reps for ${escapeHtml(name)}">−</button>
+                  <button type="button" class="step-btn" data-action="wo-step-r" data-id="${escapeHtml(id)}" data-dir="1" aria-label="Increase reps for ${escapeHtml(name)}">+</button>
+                </div>
+              </div>
+            </div>
+            <button type="button" class="add-set" data-action="wo-add-set" data-id="${escapeHtml(id)}" ${saving ? "disabled" : ""}>Add set</button>
+          </div>
+          ${logged ? `<div class="session-set">This workout: ${escapeHtml(logged)}</div>` : ""}
+        </section>`;
+      }).join("");
+      return `<header class="topbar">
+          <button class="icon-btn" data-go="#/" aria-label="Back">${backIcon()}</button>
+          <h1>${escapeHtml(activeWorkout.name)}</h1>
+        </header>
+        <main class="screen">
+          ${blocks}
+          <div class="finish-bar">
+            <button type="button" class="add-set" data-action="finish-workout">Finish workout</button>
+          </div>
+        </main>`;
+    }
+    function renderTemplateEditor() {
+      const t = templateById(route.id);
+      if (!t) {
+        return `<header class="topbar">
+          <button class="icon-btn" data-go="#/" aria-label="Back">${backIcon()}</button>
+          <h1>Template</h1>
+        </header>
+        <main class="screen"><div class="empty">That template is gone.</div></main>`;
+      }
+      const rows = t.exerciseNames.map((name, i) => `<div class="tpl-row">
+        <span class="set-idx">${i + 1}</span>
+        <span class="name">${escapeHtml(name)}</span>
+        <button type="button" class="mini" data-action="tpl-move" data-id="${escapeHtml(t.id)}" data-index="${i}" data-dir="-1" aria-label="Move ${escapeHtml(name)} up">Up</button>
+        <button type="button" class="mini" data-action="tpl-move" data-id="${escapeHtml(t.id)}" data-index="${i}" data-dir="1" aria-label="Move ${escapeHtml(name)} down">Down</button>
+        <button type="button" class="mini danger" data-action="tpl-remove" data-id="${escapeHtml(t.id)}" data-index="${i}" aria-label="Remove ${escapeHtml(name)}">Remove</button>
+      </div>`).join("");
+      const del = t.kind === "custom"
+        ? `<button type="button" class="add-ex" data-action="delete-template" data-id="${escapeHtml(t.id)}" style="margin-top:16px;color:var(--danger)">Delete template</button>`
+        : "";
+      return `<header class="topbar">
+          <button class="icon-btn" data-go="#/" aria-label="Back">${backIcon()}</button>
+          <h1>Edit</h1>
+        </header>
+        <main class="screen">
+          <label class="field-lbl" for="tpl-name">Name</label>
+          <input class="text-input" id="tpl-name" maxlength="40" value="${escapeHtml(t.name)}">
+          <button type="button" class="btn primary" data-action="save-template-name" style="width:100%;margin-bottom:16px">Save name</button>
+          <div class="eyebrow">Exercises</div>
+          ${rows || `<div class="empty">No exercises in this template yet.</div>`}
+          <button type="button" class="add-ex" data-action="tpl-add-open" data-id="${escapeHtml(t.id)}" style="margin-top:8px">+ Add exercise</button>
+          ${del}
+        </main>`;
+    }
+    function ensureWorkoutDraft(exId) {
+      const existing = workoutDrafts[exId];
+      if (existing && existing.weight !== "" && existing.reps !== "") return;
+      const prior = setsFor(exId).filter(s => !activeWorkout || s.createdAt < activeWorkout.startedAt);
+      const last = prior.length ? prior[prior.length - 1] : null;
+      workoutDrafts[exId] = last
+        ? { weight: fmtWeight(last.weightLbs, false), reps: String(last.reps) }
+        : { weight: unit() === "kg" ? "20" : "45", reps: "5" };
+    }
+    function readWorkoutDraft(exId) {
+      ensureWorkoutDraft(exId);
+      const w = document.getElementById("wo-w-" + exId);
+      const r = document.getElementById("wo-r-" + exId);
+      if (w) workoutDrafts[exId].weight = w.value;
+      if (r) workoutDrafts[exId].reps = r.value;
+    }
+    function stepWorkout(action, el) {
+      const id = el.getAttribute("data-id");
+      readWorkoutDraft(id);
+      const dir = Number(el.getAttribute("data-dir"));
+      if (action === "wo-step-w") {
+        const cur = parseWeight(workoutDrafts[id].weight);
+        const base = cur == null ? 0 : cur;
+        workoutDrafts[id].weight = String(Math.max(0, Math.round((base + dir * weightStep()) * 10) / 10));
+      } else {
+        const cur = parseReps(workoutDrafts[id].reps);
+        const base = cur == null ? 0 : cur;
+        workoutDrafts[id].reps = String(Math.max(1, base + dir));
+      }
+      render();
+    }
+    async function addWorkoutSet(exId) {
+      if (saving) return;
+      readWorkoutDraft(exId);
+      const w = parseWeight(workoutDrafts[exId].weight);
+      const r = parseReps(workoutDrafts[exId].reps);
+      if (w == null) { showToast("Enter a valid weight"); return; }
+      if (r == null) { showToast("Enter at least 1 rep"); return; }
+      const row = {
+        id: uid(),
+        exerciseId: exId,
+        weightLbs: toLbs(w),
+        reps: r,
+        createdAt: Date.now()
+      };
+      saving = true;
+      state.sets.push(row);
+      workoutDrafts[exId] = { weight: String(w), reps: String(r) };
+      try {
+        await persistSetInsert(row, w);
+        saving = false;
+        showToast("Set logged");
+      } catch (err) {
+        state.sets = state.sets.filter(s => s.id !== row.id);
+        showToast(err.message || "Couldn't log that set.");
+      } finally {
+        saving = false;
+      }
+    }
+    async function startTemplate(id) {
+      if (saving) return;
+      const t = templateById(id);
+      if (!t) return;
+      if (!t.exerciseNames.length) { showToast("Add an exercise to this template first"); return; }
+      saving = true;
+      try {
+        const exerciseIds = [];
+        for (const name of t.exerciseNames) {
+          const ex = await ensureExercise(name);
+          if (exerciseIds.indexOf(ex.id) === -1) exerciseIds.push(ex.id);
+        }
+        activeWorkout = {
+          templateId: t.id,
+          name: t.name,
+          kind: t.kind,
+          exerciseIds,
+          startedAt: Date.now()
+        };
+        workoutDrafts = {};
+        persistActive();
+        saving = false;
+        go("#/workout");
+      } catch (err) {
+        saving = false;
+        showToast(err.message || "Couldn't start that workout.");
+      }
+    }
+    async function finishWorkout() {
+      if (!activeWorkout) return go("#/");
+      const finishedId = activeWorkout.templateId;
+      state.lastTemplateId = finishedId;
+      localStorage.setItem(lastTemplateKey(), finishedId || "");
+      if (templatesMode === "remote" && finishedId && String(finishedId).indexOf("local-") !== 0) {
+        const res = await sb.from("user_settings").update({ last_template_id: finishedId }).eq("user_id", session.user.id);
+        if (res.error) console.warn(res.error);
+      }
+      activeWorkout = null;
+      workoutDrafts = {};
+      persistActive();
+      cacheTemplates();
+      showToast("Workout finished");
+      go("#/");
+    }
+    async function saveNewTemplate() {
+      const input = document.getElementById("tpl-new-name");
+      const name = (input ? input.value : (modal && modal.value) || "").trim().slice(0, 40);
+      if (!name) { showToast("Give the template a name"); return; }
+      if (state.templates.some(t => t.name.toLowerCase() === name.toLowerCase())) {
+        showToast("That template already exists");
+        return;
+      }
+      try {
+        const t = {
+          id: uid(),
+          name,
+          kind: "custom",
+          position: state.templates.length,
+          exerciseNames: []
+        };
+        if (templatesMode === "remote") {
+          const res = await sb.from("templates").insert({
+            id: t.id,
+            user_id: session.user.id,
+            name: t.name,
+            kind: "custom",
+            position: t.position,
+            exercise_names: []
+          });
+          if (res.error) {
+            if (!isMissingSchema(res.error)) throw asError(res.error, "Couldn't create that template.");
+            templatesMode = "local";
+            t.id = "local-" + t.id;
+          }
+        } else {
+          t.id = "local-" + t.id;
+        }
+        state.templates.push(t);
+        cacheTemplates();
+        modal = null;
+        go("#/template/" + encodeURIComponent(t.id));
+      } catch (err) {
+        showToast(err.message || "Couldn't create that template.");
+      }
+    }
+    async function saveTemplateName() {
+      const t = templateById(route.id);
+      const input = document.getElementById("tpl-name");
+      if (!t || !input) return;
+      const name = input.value.trim().slice(0, 40);
+      if (!name) { showToast("Give the template a name"); return; }
+      if (state.templates.some(other => other.id !== t.id && other.name.toLowerCase() === name.toLowerCase())) {
+        showToast("That template already exists");
+        return;
+      }
+      const prev = t.name;
+      t.name = name;
+      try {
+        await saveTemplateRecord(t);
+        showToast("Template saved");
+      } catch (err) {
+        t.name = prev;
+        showToast(err.message || "Couldn't save that template.");
+      }
+    }
+    async function moveTemplateExercise(id, index, dir) {
+      const t = templateById(id);
+      const i = parseInt(index, 10);
+      const delta = Number(dir);
+      if (!t || !Number.isFinite(i)) return;
+      const j = i + delta;
+      if (j < 0 || j >= t.exerciseNames.length) return;
+      const names = t.exerciseNames.slice();
+      const swap = names[i];
+      names[i] = names[j];
+      names[j] = swap;
+      t.exerciseNames = names;
+      try {
+        await saveTemplateRecord(t);
+        render();
+      } catch (err) {
+        showToast(err.message || "Couldn't save that template.");
+      }
+    }
+    async function removeTemplateExercise(id, index) {
+      const t = templateById(id);
+      const i = parseInt(index, 10);
+      if (!t || !Number.isFinite(i)) return;
+      t.exerciseNames = t.exerciseNames.filter((_, n) => n !== i);
+      try {
+        await saveTemplateRecord(t);
+        render();
+      } catch (err) {
+        showToast(err.message || "Couldn't save that template.");
+      }
+    }
+    async function addTemplateExercise(id, name) {
+      const clean = String(name || "").trim().slice(0, 60);
+      const t = templateById(id);
+      if (!t || !clean) return;
+      if (t.exerciseNames.some(n => n.toLowerCase() === clean.toLowerCase())) {
+        showToast("That exercise is already in the template");
+        return;
+      }
+      t.exerciseNames = t.exerciseNames.concat(clean);
+      try {
+        await saveTemplateRecord(t);
+        modal = null;
+        showToast("Exercise added");
+      } catch (err) {
+        t.exerciseNames = t.exerciseNames.slice(0, -1);
+        showToast(err.message || "Couldn't save that template.");
+      }
+    }
+    function addNamedTemplateExercise(id) {
+      const input = document.getElementById("tpl-add-name");
+      const name = input ? input.value : (modal && modal.value) || "";
+      return addTemplateExercise(id, name);
+    }
+    async function deleteTemplate(id) {
+      const t = templateById(id);
+      if (!t || t.kind !== "custom") return;
+      if (templatesMode === "remote" && String(id).indexOf("local-") !== 0) {
+        const res = await sb.from("templates").delete().eq("id", id);
+        if (res.error && !isMissingSchema(res.error)) {
+          showToast(res.error.message || "Couldn't delete that template.");
+          return;
+        }
+      }
+      state.templates = state.templates.filter(item => item.id !== id);
+      if (state.lastTemplateId === id) state.lastTemplateId = null;
+      cacheTemplates();
+      showToast("Template deleted");
+      go("#/");
+    }
+
 
     window.addEventListener("hashchange", () => {
       if (isAuthHash(location.hash)) return;
