@@ -106,10 +106,9 @@ async function deliver(row: { id: string; user_id: string; exercise_name: string
     .eq("user_id", row.user_id);
   if (!subs || !subs.length) return;
   const server = await pushServer();
-  const name = String(row.exercise_name || "").trim();
   const payload = JSON.stringify({
     title: "Rest over",
-    body: name ? "Time for your next set · " + name : "Time for your next set",
+    body: "Rest over - get to work - don't be a pussy",
     url: "./",
   });
   for (const sub of subs) {
