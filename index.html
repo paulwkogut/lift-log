@@ -465,6 +465,7 @@
     .settings-row:last-child { border-bottom: 0; }
     .settings-row .k { font-weight: 650; }
     .settings-row .d { color: var(--muted); font-size: 13px; margin-top: 3px; }
+    .settings-row .d.push-status { color: var(--danger); }
     .settings-row:active.tappable { background: var(--surface-2); }
 
     .seg {
@@ -572,8 +573,10 @@
       border-radius: 14px;
       z-index: 80;
       box-shadow: var(--shadow);
-      animation: pop 0.2s ease;
       max-width: calc(100% - 32px);
+      text-align: center;
+      overflow-wrap: anywhere;
+      animation: pop 0.2s ease;
     }
     body:has(#rest-sheet) .toast { bottom: calc(248px + var(--safe-b)); }
     @keyframes pop {
@@ -1482,6 +1485,9 @@
     let screenLockHold = false;
     let restPushQueue = Promise.resolve();
     let restPushMissing = false;
+    let pushEpoch = 0;
+    let pushClosing = false;
+    let pushStatus = "";
     let libQuery = "";
     let progressQuery = "";
     let progressMetric = "weight";
@@ -1831,6 +1837,7 @@
         offerMigration();
         maybeOpenTutorial();
         render();
+        if (!restSettings.push) turnPushOff({ quiet: true });
       } catch (err) {
         if (seq !== loadSeq) return;
         console.error(err);
@@ -2892,10 +2899,17 @@
                 <div class="d">${lockScreenHint()}</div>
               </div>
               <div class="seg" role="group" aria-label="Lock-screen alerts">
-                <button data-action="push-alerts" data-on="1" class="${restSettings.push ? "on" : ""}">On</button>
-                <button data-action="push-alerts" data-on="0" class="${restSettings.push ? "" : "on"}">Off</button>
+                <button type="button" data-action="push-alerts" data-on="1" class="${restSettings.push ? "on" : ""}">On</button>
+                <button type="button" data-action="push-alerts" data-on="0" class="${restSettings.push ? "" : "on"}">Off</button>
               </div>
             </div>
+            ${pushStatus ? `<div class="settings-row"><div><div class="d push-status">${escapeHtml(pushStatus)}</div></div></div>` : ""}
+            ${restSettings.push ? `<button type="button" class="settings-row tappable" data-action="push-test">
+              <div>
+                <div class="k">Send test notification</div>
+                <div class="d">Arrives in about 5 seconds. Lock the phone to confirm.</div>
+              </div>
+            </button>` : ""}
           </div>
           <div class="eyebrow">Backup</div>
           <div class="settings-card">
@@ -3263,6 +3277,23 @@
         el.addEventListener("click", (e) => {
           const action = el.getAttribute("data-action");
           if (action === "close-modal" && e.currentTarget.classList.contains("overlay") && e.target !== el) return;
+          if (action === "push-alerts" && el.getAttribute("data-on") === "1") {
+            const blocked = pushEnableBlocker();
+            if (blocked) {
+              failPush(blocked);
+              return;
+            }
+            pushClosing = false;
+            pushEpoch++;
+            let permissionPromise;
+            try {
+              permissionPromise = Notification.requestPermission();
+            } catch (err) {
+              permissionPromise = Promise.reject(err);
+            }
+            setPushAlerts(true, permissionPromise);
+            return;
+          }
           handleAction(action, el);
         });
       });
@@ -3533,6 +3564,7 @@
       if (action === "rest-sound") return setRestSound(el.getAttribute("data-on") === "1");
       if (action === "wake-lock") return setWakeLock(el.getAttribute("data-on") === "1");
       if (action === "push-alerts") return setPushAlerts(el.getAttribute("data-on") === "1");
+      if (action === "push-test") return sendTestPush();
       if (action === "rest-default") return setDefaultRest(Number(el.getAttribute("data-dir")));
       if (action === "rest-ex") return setExerciseRest(el.getAttribute("data-name"), Number(el.getAttribute("data-dir")));
       if (action === "rest-ex-clear") return clearExerciseRest(el.getAttribute("data-name"));
@@ -4897,8 +4929,54 @@
     }
     function lockScreenHint() {
       if (homeScreenRequired()) return "Add to Home Screen first. iPhone only delivers these from the home-screen app.";
-      if (typeof Notification !== "undefined" && Notification.permission === "denied") return "Notifications are blocked. Allow them for Lift Log, then turn this on.";
+      if (typeof Notification !== "undefined" && Notification.permission === "denied") return "Notifications are denied. iPhone Settings > Notifications > Lift Log > Allow";
       return "Sends a Rest over alert when the timer ends, even if the phone is locked. The on-screen timer still works if this is off.";
+    }
+    function pushEnableBlocker() {
+      if (!session) return "Not signed in.";
+      if (homeScreenRequired()) return "Add Lift Log to the Home Screen, then open it from that icon. Lock-screen alerts don't work in Safari.";
+      if (typeof Notification === "undefined" || typeof Notification.requestPermission !== "function") return "This browser can't do lock-screen alerts.";
+      if (typeof PushManager === "undefined") return "Lock-screen alerts need iOS 16.4 or later.";
+      if (!navigator.serviceWorker) return "Service worker not ready.";
+      if (!VAPID_PUBLIC_KEY) return "Missing notification keys.";
+      return "";
+    }
+    function failPush(message) {
+      restSettings.push = false;
+      saveRestSettings();
+      pushStatus = message;
+      showToast(message);
+    }
+    function withTimeout(promise, ms, message) {
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(message)), ms);
+        Promise.resolve(promise).then(value => {
+          clearTimeout(timer);
+          resolve(value);
+        }, err => {
+          clearTimeout(timer);
+          reject(err);
+        });
+      });
+    }
+    async function currentRegistration() {
+      if (!navigator.serviceWorker || !navigator.serviceWorker.getRegistration) return null;
+      return await withTimeout(navigator.serviceWorker.getRegistration(), 8000, "Service worker not ready.");
+    }
+    async function registrationReady() {
+      let reg = null;
+      try { reg = await withTimeout(navigator.serviceWorker.getRegistration(), 8000, "Service worker not ready."); } catch (err) {
+        if (err && err.message === "Service worker not ready.") throw err;
+      }
+      if (!reg) {
+        try { reg = await withTimeout(navigator.serviceWorker.register("sw.js"), 8000, "Service worker not ready."); }
+        catch (err) {
+          if (err && err.message === "Service worker not ready.") throw err;
+          const detail = err && (err.message || err.name) ? ": " + (err.name ? err.name + " " : "") + (err.message || "") : "";
+          throw new Error("Service worker not ready" + detail);
+        }
+      }
+      return await withTimeout(navigator.serviceWorker.ready, 8000, "Service worker not ready.");
     }
     function vapidKeyBytes(key) {
       const pad = "=".repeat((4 - key.length % 4) % 4);
@@ -4909,11 +4987,11 @@
       return out;
     }
     async function postRestAlert(body) {
-      if (restPushMissing || !session) return;
+      if (!session) return { ok: false, error: "Not signed in." };
       try {
         const { data } = await sb.auth.getSession();
         const token = data && data.session && data.session.access_token;
-        if (!token) return;
+        if (!token) return { ok: false, error: "Not signed in." };
         const res = await fetch(SUPABASE_URL + "/functions/v1/rest-alert", {
           method: "POST",
           headers: {
@@ -4923,12 +5001,30 @@
           },
           body: JSON.stringify(body)
         });
-        if (res.status === 404) restPushMissing = true;
-      } catch {}
+        let payload = null;
+        try { payload = await res.json(); } catch {}
+        if (res.status === 404) {
+          restPushMissing = true;
+          return { ok: false, status: 404, error: "Rest alert function isn't deployed (404)." };
+        }
+        if (!res.ok || (payload && payload.ok === false)) {
+          const code = payload && payload.code ? " (" + payload.code + ")" : "";
+          const detail = payload && (payload.error || payload.message);
+          return { ok: false, status: res.status, error: (detail || ("Rest alert failed (" + res.status + ")")) + code };
+        }
+        return { ok: true, status: res.status, id: payload && payload.id };
+      } catch (err) {
+        return { ok: false, error: (err && err.message) || "Couldn't reach the rest alert function." };
+      }
     }
     function enqueueRestPush(body) {
-      if (!restSettings.push) return;
+      if (pushClosing || !restSettings.push) return;
       restPushQueue = restPushQueue.then(() => postRestAlert(body)).catch(() => {});
+    }
+    function flushRestPush(body) {
+      const run = restPushQueue.then(() => postRestAlert(body));
+      restPushQueue = run.then(() => {}, () => {});
+      return run;
     }
     function persistRestSession() {
       try {
@@ -4972,76 +5068,137 @@
         if (restSession.phase === "done") fireRestAlert();
       } catch {}
     }
-    async function setPushAlerts(on) {
-      if (!on) {
+    async function turnPushOff(opts) {
+      const quiet = !!(opts && opts.quiet);
+      pushClosing = true;
+      const epoch = ++pushEpoch;
+      const problems = [];
+      try {
+        try {
+          const result = await flushRestPush({ action: "cancel" });
+          if (epoch !== pushEpoch) return;
+          if (!quiet && result && result.ok === false && result.error) problems.push(result.error);
+        } catch (err) {
+          if (epoch !== pushEpoch) return;
+          if (!quiet) problems.push((err && err.message) || "Couldn't cancel the scheduled alert.");
+        }
+        if (epoch !== pushEpoch) return;
         restSettings.push = false;
         saveRestSettings();
-        postRestAlert({ action: "cancel" });
         try {
-          const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
+          const reg = await currentRegistration();
+          if (epoch !== pushEpoch) return;
           const sub = reg && reg.pushManager && await reg.pushManager.getSubscription();
-          if (sub) {
-            const endpoint = sub.endpoint;
-            await sub.unsubscribe();
-            if (session) await sb.from("push_subscriptions").delete().eq("user_id", session.user.id).eq("endpoint", endpoint);
+          if (epoch !== pushEpoch) return;
+          if (sub) await sub.unsubscribe();
+        } catch (err) {
+          if (!quiet) {
+            const name = err && err.name ? err.name + ": " : "";
+            problems.push("Couldn't unsubscribe this phone (" + name + ((err && err.message) || "Service worker not ready.") + ").");
           }
-        } catch {}
-        render();
-        return;
+        }
+        if (epoch !== pushEpoch) return;
+        if (!session) {
+          problems.push("Not signed in, so the saved subscription couldn't be removed.");
+        } else {
+          const res = await sb.from("push_subscriptions").delete().eq("user_id", session.user.id);
+          if (epoch !== pushEpoch) return;
+          if (res.error) {
+            const code = res.error.code ? " (" + res.error.code + ")" : "";
+            problems.push("Couldn't delete saved alerts: " + (res.error.message || "error") + code);
+          }
+        }
+        if (epoch !== pushEpoch) return;
+        if (problems.length) {
+          pushStatus = problems.join(" ");
+          showToast(problems[0]);
+          return;
+        }
+        pushStatus = "";
+        if (!quiet) showToast("Lock-screen alerts off");
+      } finally {
+        if (epoch === pushEpoch) pushClosing = false;
       }
-      if (homeScreenRequired()) {
-        showToast("Add to Home Screen first");
-        render();
-        return;
-      }
+    }
+    async function setPushAlerts(on, permissionPromise) {
+      if (!on) return turnPushOff();
+      const epoch = pushEpoch;
+      const blocked = pushEnableBlocker();
+      if (blocked) return failPush(blocked);
+      let permission = "default";
       try {
-        if (typeof Notification === "undefined" || !("PushManager" in window) || !navigator.serviceWorker) {
-          showToast("This browser can't do lock-screen alerts.");
-          return;
-        }
-        const permission = await Notification.requestPermission();
-        if (permission !== "granted") {
-          restSettings.push = false;
-          saveRestSettings();
-          render();
-          return;
-        }
-        const reg = await navigator.serviceWorker.ready;
-        let sub = await reg.pushManager.getSubscription();
+        permission = await (permissionPromise || Notification.requestPermission());
+      } catch (err) {
+        return failPush("Couldn't ask for notification permission (" + ((err && err.name) || "Error") + ": " + ((err && err.message) || "failed") + ").");
+      }
+      if (epoch !== pushEpoch) return;
+      if (permission === "denied") return failPush("Notifications are denied. iPhone Settings > Notifications > Lift Log > Allow");
+      if (permission !== "granted") return failPush("Notification permission was dismissed. Tap On again and allow notifications.");
+      let reg;
+      try {
+        reg = await registrationReady();
+      } catch (err) {
+        return failPush((err && err.message) || "Service worker not ready.");
+      }
+      if (epoch !== pushEpoch) return;
+      if (!reg || !reg.pushManager) return failPush("Lock-screen alerts need iOS 16.4 or later.");
+      let sub;
+      try {
+        sub = await reg.pushManager.getSubscription();
         if (!sub) {
           sub = await reg.pushManager.subscribe({
             userVisibleOnly: true,
             applicationServerKey: vapidKeyBytes(VAPID_PUBLIC_KEY)
           });
         }
-        const json = sub.toJSON ? sub.toJSON() : {};
-        const keys = json.keys || {};
-        if (!session || !keys.p256dh || !keys.auth) {
-          render();
-          return;
-        }
-        const res = await sb.from("push_subscriptions").upsert({
-          user_id: session.user.id,
-          endpoint: sub.endpoint,
-          keys: { p256dh: keys.p256dh, auth: keys.auth }
-        }, { onConflict: "user_id,endpoint" });
-        if (res.error) {
-          restSettings.push = false;
-          saveRestSettings();
-          render();
-          return;
-        }
-        restSettings.push = true;
-        saveRestSettings();
-        if (restSession && restSession.phase === "run") {
-          enqueueRestPush({ action: "schedule", fireAt: restSession.endsAt, exerciseName: restSession.name || "" });
-        }
-        render();
-      } catch {
-        restSettings.push = false;
-        saveRestSettings();
-        render();
+      } catch (err) {
+        const name = (err && err.name) || "Error";
+        const message = (err && err.message) || "subscribe failed";
+        return failPush("Couldn't subscribe (" + name + ": " + message + ").");
       }
+      if (epoch !== pushEpoch) return;
+      const json = sub && sub.toJSON ? sub.toJSON() : {};
+      const keys = (json && json.keys) || {};
+      if (!session) return failPush("Not signed in.");
+      if (!keys.p256dh || !keys.auth) return failPush("Missing notification keys.");
+      const res = await sb.from("push_subscriptions").upsert({
+        user_id: session.user.id,
+        endpoint: sub.endpoint,
+        keys: { p256dh: keys.p256dh, auth: keys.auth }
+      }, { onConflict: "user_id,endpoint" });
+      if (epoch !== pushEpoch) return;
+      if (res.error) {
+        const code = res.error.code ? " (" + res.error.code + ")" : "";
+        return failPush("Couldn't save the alert: " + (res.error.message || "error") + code);
+      }
+      restSettings.push = true;
+      saveRestSettings();
+      pushStatus = "";
+      pushClosing = false;
+      if (restSession && restSession.phase === "run") {
+        enqueueRestPush({ action: "schedule", fireAt: restSession.endsAt, exerciseName: restSession.name || "" });
+      }
+      showToast("Lock-screen alerts on");
+    }
+    async function sendTestPush() {
+      if (!restSettings.push || pushClosing) {
+        pushStatus = "Turn lock-screen alerts on first.";
+        showToast(pushStatus);
+        return;
+      }
+      if (!session) {
+        pushStatus = "Not signed in.";
+        showToast(pushStatus);
+        return;
+      }
+      const result = await flushRestPush({ action: "schedule", fireAt: Date.now() + 5000, exerciseName: "Test" });
+      if (!result || result.ok === false) {
+        pushStatus = (result && result.error) || "Couldn't send the test notification.";
+        showToast(pushStatus);
+        return;
+      }
+      pushStatus = "";
+      showToast("Test notification in 5 seconds. Lock the phone to confirm.");
     }
     function maybeStartRest(name) {
       stopRestBeeps();
