@@ -1,4 +1,4 @@
-const SHELL = "lift-log-shell-v1";
+const SHELL = "lift-log-shell-v2";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -37,4 +37,33 @@ self.addEventListener("fetch", (event) => {
       return res;
     }))
   );
+});
+
+self.addEventListener("push", (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch { data = {}; }
+  const title = data.title || "Rest over";
+  const body = data.body || "Time for your next set";
+  const target = new URL(data.url || "./", self.registration.scope).href;
+  event.waitUntil(self.registration.showNotification(title, {
+    body,
+    icon: new URL("icon-192.png", self.registration.scope).href,
+    badge: new URL("favicon.png", self.registration.scope).href,
+    tag: "rest-over",
+    renotify: true,
+    data: { url: target }
+  }));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || new URL("./", self.registration.scope).href;
+  event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+    for (const client of list) {
+      if (client.url.startsWith(self.registration.scope) && "focus" in client) {
+        return client.focus();
+      }
+    }
+    if (self.clients.openWindow) return self.clients.openWindow(target);
+  }));
 });
