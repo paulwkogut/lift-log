@@ -12,3 +12,5 @@ A phone-first workout weight logger. Sign in with email and password; each accou
 Password reset and email confirmation return to that page. `index.html` loads `@supabase/supabase-js` v2 from a CDN. The project URL and publishable key in the page are public; Row Level Security limits every row to `user_id = auth.uid()`.
 
 If this browser still has a Lift Log from before accounts (`localStorage` key `lift-log-v1`), signing in offers a one-time import into that account.
+
+Push / Pull / Legs templates are included. If you ran `supabase/schema.sql` before that feature, paste [`supabase/templates.sql`](supabase/templates.sql) in the SQL editor. Until that table exists, the app still offers the three built-in workouts and keeps template edits in this browser.
