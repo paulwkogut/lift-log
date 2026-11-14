@@ -1486,6 +1486,7 @@
     let progressQuery = "";
     let progressMetric = "weight";
     let progressRange = "all";
+    let historyShown = 12;
     let libEquip = "All";
     let libMuscle = "All";
 
@@ -1555,6 +1556,9 @@
       const h = raw.replace(/^#/, "") || "/";
       if (h === "/settings") return { name: "settings" };
       if (h === "/workout") return { name: "workout" };
+      if (h === "/history") return { name: "history" };
+      const hist = h.match(/^\/history\/(\d{4}-\d{2}-\d{2})$/);
+      if (hist) return { name: "history", id: hist[1] };
       if (h === "/library") return { name: "library" };
       if (h === "/progress") return { name: "progress" };
       const pg = h.match(/^\/progress\/([^/]+)$/);
@@ -2135,6 +2139,7 @@
       if (route.name === "settings") return "settings";
       if (route.name === "exercise") return "exercise";
       if (route.name === "workout") return "workout";
+      if (route.name === "history") return "history";
       if (route.name === "template") return "template";
       if (route.name === "library") return "library";
       if (route.name === "progress") return "progress";
@@ -2157,6 +2162,7 @@
       else if (screen === "settings") html = renderSettings();
       else if (screen === "exercise") html = renderExercise();
       else if (screen === "workout") html = renderWorkout();
+      else if (screen === "history") html = renderHistory();
       else if (screen === "template") html = renderTemplateEditor();
       else if (screen === "library") html = renderLibrary();
       else if (screen === "progress") html = renderProgress();
@@ -2480,6 +2486,135 @@
         </main>`;
     }
 
+    function formatDuration(sets) {
+      if (!sets || sets.length < 2) return "";
+      const times = sets.map(s => s.createdAt).slice().sort((a, b) => a - b);
+      const mins = Math.round((times[times.length - 1] - times[0]) / 60000);
+      if (mins < 1) return "";
+      if (mins < 60) return mins + " min";
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      return m ? h + "h " + m + "m" : h + "h";
+    }
+    function templateNameForDay(date, sets) {
+      if (!activeWorkout || !activeWorkout.name || !activeWorkout.startedAt) return "";
+      if (todayKey(activeWorkout.startedAt) !== date) return "";
+      if (!sets.length || sets.some(s => s.createdAt < activeWorkout.startedAt)) return "";
+      return activeWorkout.name;
+    }
+    function workoutHistory() {
+      const map = new Map();
+      state.sets.forEach(s => {
+        const key = todayKey(s.createdAt);
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push(s);
+      });
+      return Array.from(map.entries()).map(([date, sets]) => {
+        const ordered = sets.slice().sort((a, b) => a.createdAt - b.createdAt);
+        const exerciseIds = [];
+        ordered.forEach(s => { if (exerciseIds.indexOf(s.exerciseId) === -1) exerciseIds.push(s.exerciseId); });
+        const volume = ordered.reduce((sum, s) => sum + toDisplay(s.weightLbs) * s.reps, 0);
+        return {
+          date,
+          sets: ordered,
+          exerciseIds,
+          volume,
+          duration: formatDuration(ordered),
+          templateName: templateNameForDay(date, ordered)
+        };
+      }).sort((a, b) => a.date < b.date ? 1 : -1);
+    }
+    function volumeLabel(day) {
+      if (day.sets.length && day.sets.every(s => isBwSet(s.weightLbs))) return "BW";
+      return Math.round(day.volume) + (unit() === "kg" ? " kg" : " lb");
+    }
+    function trashIcon() {
+      return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"></path><path d="M9 7V5h6v2"></path><path d="M8 7l1 13h6l1-13"></path></svg>`;
+    }
+    async function deleteHistorySet(id, dateKey) {
+      await deleteSet(id);
+      if (dateKey && !state.sets.some(s => todayKey(s.createdAt) === dateKey)) go("#/history");
+    }
+    async function deleteWorkout() {
+      if (!modal || modal.type !== "delete-workout" || modal.busy) return;
+      const date = modal.date;
+      const ids = state.sets.filter(s => todayKey(s.createdAt) === date).map(s => s.id);
+      const backup = state.sets.slice();
+      modal.busy = true;
+      render();
+      state.sets = state.sets.filter(s => todayKey(s.createdAt) !== date);
+      try {
+        for (const id of ids) await persistSetDelete(id);
+        modal = null;
+        showToast("Workout deleted");
+        go("#/history");
+      } catch (err) {
+        state.sets = backup;
+        modal = null;
+        showToast(err.message || "Couldn't delete that workout.");
+        loadAccount();
+      }
+    }
+    function renderHistory() {
+      const days = workoutHistory();
+      if (route.id) {
+        const day = days.find(item => item.date === route.id);
+        if (!day) {
+          return `<header class="topbar">
+            <button class="icon-btn" data-go="#/history" aria-label="Back">${backIcon()}</button>
+            <h1>Workout</h1>
+          </header>
+          <main class="screen"><div class="empty">That workout is gone.</div></main>`;
+        }
+        const blocks = day.exerciseIds.map(id => {
+          const ex = exerciseById(id);
+          const name = ex ? ex.name : "Missing exercise";
+          const rows = day.sets.filter(s => s.exerciseId === id).map(s => `
+            <div class="set-row">
+              <div class="set-main">${escapeHtml(isBwSet(s.weightLbs) ? "BW" : fmtWeight(s.weightLbs, true))} <span>× ${s.reps}</span></div>
+              <button type="button" class="mini danger" data-action="history-delete-set" data-id="${escapeHtml(s.id)}" data-date="${escapeHtml(day.date)}" aria-label="Delete set">${trashIcon()}</button>
+            </div>`).join("");
+          return `<section class="day-group">
+            <div class="day-head"><button type="button" class="when title-link" data-go="#/progress/${encodeURIComponent(id)}">${escapeHtml(name)}</button></div>
+            ${rows}
+          </section>`;
+        }).join("");
+        const bits = [day.exerciseIds.length + " exercise" + (day.exerciseIds.length === 1 ? "" : "s"), day.sets.length + " set" + (day.sets.length === 1 ? "" : "s"), volumeLabel(day)];
+        if (day.duration) bits.push(day.duration);
+        return `<header class="topbar">
+            <button class="icon-btn" data-go="#/history" aria-label="Back">${backIcon()}</button>
+            <h1>${escapeHtml(formatDay(day.date))}</h1>
+          </header>
+          <main class="screen">
+            ${day.templateName ? `<div class="eyebrow">${escapeHtml(day.templateName)}</div>` : ""}
+            <p class="wo-progress">${escapeHtml(bits.join(" · "))}</p>
+            ${blocks}
+            <button type="button" class="btn danger delete-account" data-action="history-delete-open" data-date="${escapeHtml(day.date)}">Delete workout</button>
+          </main>`;
+      }
+      const shown = days.slice(0, historyShown);
+      const rows = shown.map(day => {
+        const bits = [day.exerciseIds.length + " exercise" + (day.exerciseIds.length === 1 ? "" : "s"), day.sets.length + " set" + (day.sets.length === 1 ? "" : "s"), volumeLabel(day)];
+        if (day.duration) bits.push(day.duration);
+        const title = formatDay(day.date) + (day.templateName ? " · " + day.templateName : "");
+        return `<button type="button" class="ex-row" data-go="#/history/${day.date}">
+          <span class="meta"><span class="name">${escapeHtml(title)}</span><span class="last">${escapeHtml(bits.join(" · "))}</span></span>
+          <span class="chev" aria-hidden="true">${chevron()}</span>
+        </button>`;
+      }).join("");
+      const more = days.length > shown.length
+        ? `<button type="button" class="add-ex" data-action="history-more" style="margin-top:8px">Show older</button>`
+        : "";
+      return `<header class="topbar">
+          <button class="icon-btn" data-go="#/" aria-label="Back">${backIcon()}</button>
+          <h1>History</h1>
+        </header>
+        <main class="screen">
+          <div class="ex-list">${rows || `<div class="empty">No workouts yet. Log a set to start a history.</div>`}</div>
+          ${more}
+        </main>`;
+    }
+
     function renderHome() {
       const used = new Map();
       for (const s of state.sets) used.set(s.exerciseId, s.createdAt);
@@ -2514,6 +2649,7 @@
           ${renderWorkoutSection()}
           <div class="eyebrow">Exercises</div>
           <button type="button" class="browse-lib" data-go="#/progress">Progress</button>
+          <button type="button" class="browse-lib" data-go="#/history">Workout history</button>
           <button type="button" class="browse-lib" data-action="open-library">Browse library</button>
           <div class="ex-list">${rows || `<div class="empty">No exercises yet. Add one to start logging.</div>`}</div>
           <div class="add-ex-wrap">
@@ -2865,6 +3001,20 @@
     }
     function renderModal() {
       if (!modal) return "";
+      if (modal.type === "delete-workout") {
+        const n = modal.count || 0;
+        return `<div class="overlay" data-action="close-modal">
+          <div class="sheet" role="dialog" aria-modal="true" aria-label="Delete workout">
+            <div class="grab"></div>
+            <h2>Delete this workout?</h2>
+            <p class="hint">Delete this workout and its ${n} set${n === 1 ? "" : "s"}? This can't be undone.</p>
+            <div class="sheet-actions">
+              <button type="button" class="btn ghost" data-action="close-modal" ${modal.busy ? "disabled" : ""}>Cancel</button>
+              <button type="button" class="btn danger" data-action="history-delete-confirm" ${modal.busy ? "disabled" : ""}>Delete workout</button>
+            </div>
+          </div>
+        </div>`;
+      }
       if (modal.type === "delete-account") {
         const phrase = modal.phrase || "";
         const ready = phrase.trim() === "DELETE" && !modal.busy;
@@ -3390,6 +3540,14 @@
       if (action === "wo-step-w" || action === "wo-step-r") return stepWorkout(action, el);
       if (action === "wo-add-set") return addWorkoutSet(el.getAttribute("data-id"));
       if (action === "finish-workout") return finishWorkout();
+      if (action === "history-more") { historyShown += 12; render(); return; }
+      if (action === "history-delete-open") {
+        const day = workoutHistory().find(item => item.date === el.getAttribute("data-date"));
+        modal = { type: "delete-workout", date: el.getAttribute("data-date"), count: day ? day.sets.length : 0 };
+        return render();
+      }
+      if (action === "history-delete-confirm") return deleteWorkout();
+      if (action === "history-delete-set") return deleteHistorySet(el.getAttribute("data-id"), el.getAttribute("data-date"));
     }
 
     async function submitAuth() {
