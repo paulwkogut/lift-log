@@ -1,4 +1,4 @@
-const SHELL = "lift-log-shell-v6";
+const SHELL = "lift-log-shell-v7";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
