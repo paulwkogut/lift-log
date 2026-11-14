@@ -323,7 +323,7 @@
       color: var(--faint);
       font-size: 12px;
       font-weight: 700;
-      width: 18px;
+      min-width: 46px;
     }
     .set-main { flex: 1; font-weight: 650; font-variant-numeric: tabular-nums; }
     .set-main span { color: var(--muted); font-weight: 500; }
@@ -620,7 +620,186 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .wo-card .mini { align-self: center; }
+    .edit-chip {
+      align-self: center;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      min-width: 64px;
+      min-height: 72px;
+      margin: 4px;
+      border-radius: 16px;
+      background: var(--accent-dim);
+      color: var(--accent-2);
+      font-size: 13px;
+      font-weight: 750;
+    }
+    .edit-chip:active { transform: scale(0.96); }
+    .edit-chip svg { display: block; }
+    .reorder-btn {
+      width: 44px;
+      height: 44px;
+      flex-shrink: 0;
+      border-radius: 12px;
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      color: var(--accent-2);
+      font-size: 18px;
+      line-height: 1;
+    }
+    .reorder-btn:active { background: var(--accent-dim); }
+    .icon-x {
+      width: 44px;
+      height: 44px;
+      flex-shrink: 0;
+      border-radius: 12px;
+      background: var(--danger-dim);
+      color: var(--danger);
+      font-size: 22px;
+      line-height: 1;
+    }
+    .icon-x:active { transform: scale(0.96); }
+    .grip {
+      width: 18px;
+      flex-shrink: 0;
+      display: grid;
+      gap: 3px;
+      color: var(--faint);
+    }
+    .grip i {
+      display: block;
+      height: 2px;
+      border-radius: 2px;
+      background: currentColor;
+    }
+    .wo-block-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+    .wo-block-head > div { flex: 1; min-width: 0; }
+    .also-save {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 52px;
+      margin: 0 0 12px;
+      font-weight: 650;
+    }
+    .also-save input { width: 22px; height: 22px; accent-color: var(--accent); }
+    .picker-empty { color: var(--muted); font-size: 14px; padding: 8px 4px 12px; }
+    .tpl-row { flex-wrap: wrap; }
+    .tpl-line { display: flex; align-items: center; gap: 6px; width: 100%; }
+    .tpl-targets {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+      padding: 2px 0 4px;
+    }
+    .tpl-targets .lbl {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 750;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .target-val { min-width: 22px; text-align: center; font-weight: 750; font-variant-numeric: tabular-nums; }
+    .wo-progress { color: var(--muted); font-size: 13px; font-weight: 700; margin: 0 0 12px; }
+    .set-plan {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 52px;
+      margin-top: 8px;
+    }
+    .set-no { width: 48px; flex-shrink: 0; color: var(--muted); font-size: 13px; font-weight: 750; }
+    .set-plan.done .set-no { color: var(--good); }
+    .plan-input {
+      width: 64px;
+      height: 44px;
+      text-align: center;
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      font-weight: 750;
+      font-size: 18px;
+      font-variant-numeric: tabular-nums;
+    }
+    .plan-input.reps { width: 52px; }
+    .plan-x { color: var(--muted); font-weight: 650; }
+    .log-btn {
+      margin-left: auto;
+      min-width: 64px;
+      height: 44px;
+      padding: 0 12px;
+      border-radius: 12px;
+      background: var(--accent);
+      color: #1a0a00;
+      font-weight: 800;
+    }
+    .log-btn:disabled { opacity: 0.35; }
+    .done-mark { margin-left: auto; color: var(--good); font-weight: 750; }
+    .add-extra {
+      width: 100%;
+      min-height: 44px;
+      margin-top: 6px;
+      color: var(--accent-2);
+      font-weight: 700;
+    }
+    .rest-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 0 0 12px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: var(--accent);
+      color: #1a0a00;
+    }
+    .rest-bar .time { font-size: 28px; font-weight: 800; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+    .rest-bar button {
+      min-height: 44px;
+      padding: 0 14px;
+      border-radius: 12px;
+      background: #1a0a00;
+      color: var(--accent-2);
+      font-weight: 750;
+    }
+    .browse-lib {
+      width: 100%;
+      min-height: 52px;
+      margin: 0 0 10px;
+      border-radius: 16px;
+      border: 1px solid var(--accent);
+      background: var(--accent-dim);
+      color: var(--accent-2);
+      font-weight: 750;
+    }
+    .chip-row {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      margin: 0 -16px 8px;
+      padding: 0 16px 6px;
+      scrollbar-width: none;
+    }
+    .chip-row::-webkit-scrollbar { display: none; }
+    .chip {
+      flex: 0 0 auto;
+      height: 36px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .chip.on { background: var(--accent); border-color: var(--accent); color: #1a0a00; }
+    .lib-count { color: var(--muted); font-size: 12px; margin: 0 2px 8px; }
+    .lib-group { margin-bottom: 8px; }
+    .pick-label { color: var(--muted); font-size: 11px; font-weight: 750; letter-spacing: 0.07em; text-transform: uppercase; margin: 4px 2px; }
     .resume-bar {
       width: 100%;
       min-height: 52px;
@@ -662,7 +841,7 @@
       min-height: 52px;
     }
     .tpl-row .name { flex: 1; min-width: 0; font-weight: 650; }
-    .pick-list { display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow: auto; margin-bottom: 12px; }
+    .pick-list { display: flex; flex-direction: column; gap: 6px; max-height: 34vh; overflow: auto; margin-bottom: 12px; }
     .pick-list button {
       text-align: left;
       min-height: 48px;
@@ -702,6 +881,203 @@
       "pull-up": ["Lat Pulldown"],
       "lat pulldown": ["Pull-up"]
     };
+
+    const EQUIPMENT = ["Bodyweight", "Dumbbell", "Barbell", "Cable", "Machine", "Kettlebell", "EZ-bar", "Trap bar", "Resistance band", "Other"];
+    const MUSCLES = ["Chest", "Back", "Shoulders", "Biceps", "Triceps", "Legs", "Glutes", "Core", "Full body"];
+    const LIBRARY = [
+      ["Push-up", "Bodyweight", "Chest"],
+      ["Diamond Push-up", "Bodyweight", "Chest"],
+      ["Decline Push-up", "Bodyweight", "Chest"],
+      ["Archer Push-up", "Bodyweight", "Chest"],
+      ["Pike Push-up", "Bodyweight", "Chest"],
+      ["Pull-up", "Bodyweight", "Back"],
+      ["Neutral-grip Pull-up", "Bodyweight", "Back"],
+      ["Inverted Row", "Bodyweight", "Back"],
+      ["Superman", "Bodyweight", "Back"],
+      ["Chin-up", "Bodyweight", "Biceps"],
+      ["Pike Push-up Hold", "Bodyweight", "Shoulders"],
+      ["Handstand Hold", "Bodyweight", "Shoulders"],
+      ["Wall Walk", "Bodyweight", "Shoulders"],
+      ["Dip", "Bodyweight", "Triceps"],
+      ["Bench Dip", "Bodyweight", "Triceps"],
+      ["Muscle-up", "Bodyweight", "Full body"],
+      ["Burpee", "Bodyweight", "Full body"],
+      ["Bear Crawl", "Bodyweight", "Full body"],
+      ["Plank", "Bodyweight", "Core"],
+      ["Side Plank", "Bodyweight", "Core"],
+      ["Hollow Hold", "Bodyweight", "Core"],
+      ["Dead Bug", "Bodyweight", "Core"],
+      ["Bird Dog", "Bodyweight", "Core"],
+      ["Sit-up", "Bodyweight", "Core"],
+      ["Crunch", "Bodyweight", "Core"],
+      ["Bicycle Crunch", "Bodyweight", "Core"],
+      ["Leg Raise", "Bodyweight", "Core"],
+      ["Hanging Leg Raise", "Bodyweight", "Core"],
+      ["Hanging Knee Raise", "Bodyweight", "Core"],
+      ["Toes-to-bar", "Bodyweight", "Core"],
+      ["Mountain Climber", "Bodyweight", "Core"],
+      ["Air Squat", "Bodyweight", "Legs"],
+      ["Jump Squat", "Bodyweight", "Legs"],
+      ["Pistol Squat", "Bodyweight", "Legs"],
+      ["Lunge", "Bodyweight", "Legs"],
+      ["Reverse Lunge", "Bodyweight", "Legs"],
+      ["Walking Lunge", "Bodyweight", "Legs"],
+      ["Bulgarian Split Squat", "Bodyweight", "Legs"],
+      ["Cossack Squat", "Bodyweight", "Legs"],
+      ["Wall Sit", "Bodyweight", "Legs"],
+      ["Bodyweight Calf Raise", "Bodyweight", "Legs"],
+      ["Nordic Hamstring Curl", "Bodyweight", "Legs"],
+      ["Glute Bridge", "Bodyweight", "Glutes"],
+      ["Single-leg Glute Bridge", "Bodyweight", "Glutes"],
+      ["Bodyweight Hip Thrust", "Bodyweight", "Glutes"],
+      ["Dumbbell Bench Press", "Dumbbell", "Chest"],
+      ["Incline Dumbbell Press", "Dumbbell", "Chest"],
+      ["Decline Dumbbell Press", "Dumbbell", "Chest"],
+      ["Dumbbell Fly", "Dumbbell", "Chest"],
+      ["Dumbbell Pullover", "Dumbbell", "Chest"],
+      ["Dumbbell Floor Press", "Dumbbell", "Chest"],
+      ["Dumbbell Shoulder Press", "Dumbbell", "Shoulders"],
+      ["Arnold Press", "Dumbbell", "Shoulders"],
+      ["Dumbbell Lateral Raise", "Dumbbell", "Shoulders"],
+      ["Dumbbell Front Raise", "Dumbbell", "Shoulders"],
+      ["Dumbbell Rear Delt Fly", "Dumbbell", "Shoulders"],
+      ["Dumbbell Shrug", "Dumbbell", "Shoulders"],
+      ["Dumbbell Curl", "Dumbbell", "Biceps"],
+      ["Hammer Curl", "Dumbbell", "Biceps"],
+      ["Incline Dumbbell Curl", "Dumbbell", "Biceps"],
+      ["Concentration Curl", "Dumbbell", "Biceps"],
+      ["Dumbbell Kickback", "Dumbbell", "Triceps"],
+      ["Overhead Dumbbell Extension", "Dumbbell", "Triceps"],
+      ["Dumbbell Skull Crusher", "Dumbbell", "Triceps"],
+      ["One-arm Dumbbell Row", "Dumbbell", "Back"],
+      ["Dumbbell Renegade Row", "Dumbbell", "Back"],
+      ["Chest-supported Dumbbell Row", "Dumbbell", "Back"],
+      ["Dumbbell Goblet Squat", "Dumbbell", "Legs"],
+      ["Dumbbell Romanian Deadlift", "Dumbbell", "Legs"],
+      ["Dumbbell Lunge", "Dumbbell", "Legs"],
+      ["Dumbbell Step-up", "Dumbbell", "Legs"],
+      ["Dumbbell Bulgarian Split Squat", "Dumbbell", "Legs"],
+      ["Dumbbell Calf Raise", "Dumbbell", "Legs"],
+      ["Dumbbell Hip Thrust", "Dumbbell", "Glutes"],
+      ["Dumbbell Side Bend", "Dumbbell", "Core"],
+      ["Dumbbell Russian Twist", "Dumbbell", "Core"],
+      ["Bench Press", "Barbell", "Chest"],
+      ["Incline Bench Press", "Barbell", "Chest"],
+      ["Decline Bench Press", "Barbell", "Chest"],
+      ["Close-grip Bench Press", "Barbell", "Chest"],
+      ["Overhead Press", "Barbell", "Shoulders"],
+      ["Push Press", "Barbell", "Shoulders"],
+      ["Barbell Upright Row", "Barbell", "Shoulders"],
+      ["Barbell Row", "Barbell", "Back"],
+      ["Pendlay Row", "Barbell", "Back"],
+      ["Barbell Shrug", "Barbell", "Back"],
+      ["Squat", "Barbell", "Legs"],
+      ["Front Squat", "Barbell", "Legs"],
+      ["Romanian Deadlift", "Barbell", "Legs"],
+      ["Deadlift", "Barbell", "Legs"],
+      ["Sumo Deadlift", "Barbell", "Legs"],
+      ["Good Morning", "Barbell", "Legs"],
+      ["Barbell Lunge", "Barbell", "Legs"],
+      ["Barbell Calf Raise", "Barbell", "Legs"],
+      ["Barbell Hip Thrust", "Barbell", "Glutes"],
+      ["Barbell Curl", "Barbell", "Biceps"],
+      ["Barbell Skull Crusher", "Barbell", "Triceps"],
+      ["Power Clean", "Barbell", "Full body"],
+      ["Hang Clean", "Barbell", "Full body"],
+      ["Clean and Jerk", "Barbell", "Full body"],
+      ["Thruster", "Barbell", "Full body"],
+      ["Snatch", "Barbell", "Full body"],
+      ["Lat Pulldown", "Cable", "Back"],
+      ["Straight-arm Pulldown", "Cable", "Back"],
+      ["Seated Cable Row", "Cable", "Back"],
+      ["Face Pull", "Cable", "Back"],
+      ["Cable Upright Row", "Cable", "Back"],
+      ["Cable Fly", "Cable", "Chest"],
+      ["Cable Crossover", "Cable", "Chest"],
+      ["Cable Lateral Raise", "Cable", "Shoulders"],
+      ["Cable Face Pull", "Cable", "Shoulders"],
+      ["Cable External Rotation", "Cable", "Shoulders"],
+      ["Cable Curl", "Cable", "Biceps"],
+      ["Cable Hammer Curl", "Cable", "Biceps"],
+      ["Triceps Pushdown", "Cable", "Triceps"],
+      ["Overhead Cable Extension", "Cable", "Triceps"],
+      ["Cable Kickback", "Cable", "Triceps"],
+      ["Cable Crunch", "Cable", "Core"],
+      ["Cable Woodchop", "Cable", "Core"],
+      ["Pallof Press", "Cable", "Core"],
+      ["Cable Pull-through", "Cable", "Glutes"],
+      ["Cable Glute Kickback", "Cable", "Glutes"],
+      ["Leg Press", "Machine", "Legs"],
+      ["Hack Squat", "Machine", "Legs"],
+      ["Leg Extension", "Machine", "Legs"],
+      ["Lying Leg Curl", "Machine", "Legs"],
+      ["Seated Leg Curl", "Machine", "Legs"],
+      ["Standing Calf Raise", "Machine", "Legs"],
+      ["Seated Calf Raise", "Machine", "Legs"],
+      ["Belt Squat", "Machine", "Legs"],
+      ["Smith Machine Squat", "Machine", "Legs"],
+      ["Machine Chest Press", "Machine", "Chest"],
+      ["Pec Deck", "Machine", "Chest"],
+      ["Smith Machine Bench Press", "Machine", "Chest"],
+      ["Machine Row", "Machine", "Back"],
+      ["Machine Lat Pulldown", "Machine", "Back"],
+      ["Assisted Pull-up", "Machine", "Back"],
+      ["T-bar Row", "Machine", "Back"],
+      ["Chest-supported Machine Row", "Machine", "Back"],
+      ["Back Extension", "Machine", "Back"],
+      ["Machine Shoulder Press", "Machine", "Shoulders"],
+      ["Smith Machine Shoulder Press", "Machine", "Shoulders"],
+      ["Machine Lateral Raise", "Machine", "Shoulders"],
+      ["Reverse Pec Deck", "Machine", "Shoulders"],
+      ["Machine Preacher Curl", "Machine", "Biceps"],
+      ["Assisted Dip", "Machine", "Triceps"],
+      ["Machine Dip", "Machine", "Triceps"],
+      ["Hip Abduction", "Machine", "Glutes"],
+      ["Hip Adduction", "Machine", "Glutes"],
+      ["Glute Drive", "Machine", "Glutes"],
+      ["Smith Machine Hip Thrust", "Machine", "Glutes"],
+      ["Kettlebell Swing", "Kettlebell", "Full body"],
+      ["Kettlebell Snatch", "Kettlebell", "Full body"],
+      ["Kettlebell Clean", "Kettlebell", "Full body"],
+      ["Turkish Get-up", "Kettlebell", "Full body"],
+      ["Kettlebell Goblet Squat", "Kettlebell", "Legs"],
+      ["Kettlebell Deadlift", "Kettlebell", "Legs"],
+      ["Kettlebell Press", "Kettlebell", "Shoulders"],
+      ["Kettlebell Halo", "Kettlebell", "Shoulders"],
+      ["Kettlebell Row", "Kettlebell", "Back"],
+      ["Kettlebell Windmill", "Kettlebell", "Core"],
+      ["EZ-bar Curl", "EZ-bar", "Biceps"],
+      ["EZ-bar Preacher Curl", "EZ-bar", "Biceps"],
+      ["EZ-bar Skull Crusher", "EZ-bar", "Triceps"],
+      ["EZ-bar Upright Row", "EZ-bar", "Shoulders"],
+      ["EZ-bar Close-grip Press", "EZ-bar", "Chest"],
+      ["Trap-bar Deadlift", "Trap bar", "Back"],
+      ["Trap-bar Shrug", "Trap bar", "Back"],
+      ["Trap-bar Romanian Deadlift", "Trap bar", "Legs"],
+      ["Trap-bar Farmer Carry", "Trap bar", "Full body"],
+      ["Band Pull-apart", "Resistance band", "Back"],
+      ["Band Row", "Resistance band", "Back"],
+      ["Band Face Pull", "Resistance band", "Back"],
+      ["Band Chest Press", "Resistance band", "Chest"],
+      ["Band Squat", "Resistance band", "Legs"],
+      ["Band Deadlift", "Resistance band", "Legs"],
+      ["Band Good Morning", "Resistance band", "Legs"],
+      ["Band Lateral Walk", "Resistance band", "Glutes"],
+      ["Band Curl", "Resistance band", "Biceps"],
+      ["Band Pushdown", "Resistance band", "Triceps"],
+      ["Sled Push", "Other", "Full body"],
+      ["Sled Pull", "Other", "Full body"],
+      ["Farmer Carry", "Other", "Full body"],
+      ["Sandbag Carry", "Other", "Full body"],
+      ["Battle Ropes", "Other", "Full body"],
+      ["Landmine Press", "Other", "Shoulders"],
+      ["Landmine Row", "Other", "Back"],
+      ["Landmine Squat", "Other", "Legs"],
+      ["Box Jump", "Other", "Legs"],
+      ["Medicine Ball Slam", "Other", "Core"],
+      ["Medicine Ball Russian Twist", "Other", "Core"],
+      ["Ab Wheel Rollout", "Other", "Core"],
+    ].map(([name, equipment, muscle]) => ({ name, equipment, muscle }));
 
     const appEl = document.getElementById("app");
     if (!window.supabase || typeof window.supabase.createClient !== "function") {
@@ -749,8 +1125,15 @@
     let saving = false;
     let focusAuthField = "";
     let templatesMode = "local";
+    let targetsColumn = true;
     let activeWorkout = null;
     let workoutDrafts = {};
+    let planDrafts = {};
+    let restUntil = 0;
+    let restTick = 0;
+    let libQuery = "";
+    let libEquip = "All";
+    let libMuscle = "All";
 
     function blankState() {
       return {
@@ -818,6 +1201,7 @@
       const h = raw.replace(/^#/, "") || "/";
       if (h === "/settings") return { name: "settings" };
       if (h === "/workout") return { name: "workout" };
+      if (h === "/library") return { name: "library" };
       const tm = h.match(/^\/template\/([^/]+)$/);
       if (tm) return { name: "template", id: decodeURIComponent(tm[1]) };
       const m = h.match(/^\/exercise\/([^/]+)$/);
@@ -848,6 +1232,7 @@
     function fmtWeight(lbs, withUnit) {
       const n = toDisplay(lbs);
       const rounded = unit() === "kg" ? Math.round(n * 10) / 10 : Math.round(n * 2) / 2;
+      if (rounded === 0) return withUnit ? "BW" : "0";
       const s = unit() === "kg"
         ? (Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1))
         : (Number.isInteger(rounded) ? String(rounded) : String(rounded));
@@ -941,7 +1326,8 @@
       if (last) {
         draft = { weight: fmtWeight(last.weightLbs, false), reps: String(last.reps) };
       } else {
-        draft = { weight: unit() === "kg" ? "20" : "45", reps: "5" };
+        const ex = exerciseById(exId);
+        draft = { weight: startingWeight(ex && ex.name), reps: "5" };
       }
       draftExId = exId;
     }
@@ -1264,6 +1650,9 @@
         state = blankState();
         activeWorkout = null;
         workoutDrafts = {};
+        planDrafts = {};
+        restUntil = 0;
+        clearInterval(restTick);
         templatesMode = "local";
         modal = null;
         draft = { weight: "", reps: "" };
@@ -1345,6 +1734,7 @@
       if (route.name === "exercise") return "exercise";
       if (route.name === "workout") return "workout";
       if (route.name === "template") return "template";
+      if (route.name === "library") return "library";
       return "home";
     }
 
@@ -1365,6 +1755,7 @@
       else if (screen === "exercise") html = renderExercise();
       else if (screen === "workout") html = renderWorkout();
       else if (screen === "template") html = renderTemplateEditor();
+      else if (screen === "library") html = renderLibrary();
       else html = renderHome();
 
       const showModal = screen !== "auth" && screen !== "loading" && screen !== "recovery" && screen !== "error";
@@ -1373,6 +1764,9 @@
       appEl.innerHTML = html;
       hydrateAuthFields();
       bind();
+      document.querySelectorAll(".chip.on").forEach(el => {
+        if (el.scrollIntoView) el.scrollIntoView({ inline: "center", block: "nearest" });
+      });
 
       if (focusAuthField) {
         const preferred = document.getElementById(focusAuthField);
@@ -1520,6 +1914,7 @@
         <main class="screen">
           ${renderWorkoutSection()}
           <div class="eyebrow">Exercises</div>
+          <button type="button" class="browse-lib" data-action="open-library">Browse library</button>
           <div class="ex-list">${rows || `<div class="empty">No exercises yet. Add one to start logging.</div>`}</div>
           <div class="add-ex-wrap">
             <button class="add-ex" data-action="add-exercise">+ Add exercise</button>
@@ -1559,7 +1954,7 @@
             : Math.round(vol) + " lb volume";
           const rows = g.sets.map((s, i) => `
             <div class="set-row">
-              <div class="set-idx">${i + 1}</div>
+              <div class="set-idx">Set ${i + 1}</div>
               <div class="set-main">${escapeHtml(fmtWeight(s.weightLbs, true))} <span>× ${s.reps}</span></div>
               <div class="row-actions">
                 <button class="mini" data-action="edit-set" data-id="${s.id}">Edit</button>
@@ -1712,24 +2107,8 @@
           </div>
         </div>`;
       }
-      if (modal.type === "add-template-exercise") {
-        const t = templateById(modal.id);
-        const have = new Set((t ? t.exerciseNames : []).map(n => n.toLowerCase()));
-        const picks = state.exercises.filter(e => !have.has(e.name.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name));
-        const list = picks.map(e => `<button type="button" data-action="tpl-add-existing" data-id="${escapeHtml(modal.id)}" data-name="${escapeHtml(e.name)}">${escapeHtml(e.name)}</button>`).join("");
-        return `<div class="overlay" data-action="close-modal">
-          <div class="sheet" role="dialog" aria-modal="true" aria-label="Add exercise">
-            <div class="grab"></div>
-            <h2>Add exercise</h2>
-            <div class="pick-list">${list || `<div class="empty">No other exercises yet.</div>`}</div>
-            <label class="field-lbl" for="tpl-add-name">Or a new name</label>
-            <input class="text-input" id="tpl-add-name" maxlength="60" value="${escapeHtml(modal.value || "")}" placeholder="e.g. Face Pull">
-            <div class="sheet-actions">
-              <button class="btn ghost" data-action="close-modal">Cancel</button>
-              <button class="btn primary" data-action="tpl-add-named" data-id="${escapeHtml(modal.id)}">Add</button>
-            </div>
-          </div>
-        </div>`;
+      if (modal.type === "add-template-exercise" || modal.type === "add-workout-exercise") {
+        return renderExercisePicker();
       }
       if (modal.type === "add-exercise" || modal.type === "rename-exercise") {
         const title = modal.type === "add-exercise" ? "New exercise" : "Rename exercise";
@@ -1858,6 +2237,9 @@
     function backIcon() {
       return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>`;
     }
+    function pencilIcon() {
+      return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>`;
+    }
     function chevron() {
       return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>`;
     }
@@ -1951,6 +2333,31 @@
       });
       const tplName = document.getElementById("tpl-name");
       if (tplName) tplName.addEventListener("change", () => saveTemplateName());
+      const libSearch = document.getElementById("lib-search");
+      if (libSearch) {
+        libSearch.addEventListener("input", () => {
+          libQuery = libSearch.value;
+          render();
+        });
+      }
+      const picker = document.getElementById("picker-search");
+      if (picker && modal) {
+        picker.addEventListener("input", () => {
+          const box = document.getElementById("also-save-template");
+          const nameInput = document.getElementById("tpl-add-name");
+          if (box) modal.alsoSave = box.checked;
+          if (nameInput) modal.value = nameInput.value;
+          modal.query = picker.value;
+          render();
+        });
+      }
+      document.querySelectorAll("[data-plan-weight], [data-plan-reps]").forEach(input => {
+        input.addEventListener("input", () => {
+          const id = input.getAttribute("data-plan-weight") || input.getAttribute("data-plan-reps");
+          const index = input.getAttribute("data-index");
+          readPlan(id, index);
+        });
+      });
 
       const authFormEl = document.getElementById("auth-form");
       if (authFormEl) authFormEl.addEventListener("submit", (e) => {
@@ -2073,11 +2480,30 @@
       if (action === "tpl-move") return moveTemplateExercise(el.getAttribute("data-id"), el.getAttribute("data-index"), el.getAttribute("data-dir"));
       if (action === "tpl-remove") return removeTemplateExercise(el.getAttribute("data-id"), el.getAttribute("data-index"));
       if (action === "tpl-add-open") {
-        modal = { type: "add-template-exercise", id: el.getAttribute("data-id"), value: "" };
+        modal = { type: "add-template-exercise", id: el.getAttribute("data-id"), value: "", query: "" };
         return render();
       }
-      if (action === "tpl-add-existing") return addTemplateExercise(el.getAttribute("data-id"), el.getAttribute("data-name"));
-      if (action === "tpl-add-named") return addNamedTemplateExercise(el.getAttribute("data-id"));
+      if (action === "wo-add-open") {
+        modal = { type: "add-workout-exercise", value: "", query: "", alsoSave: false };
+        return render();
+      }
+      if (action === "tpl-add-library") return pickLibraryExercise(el.getAttribute("data-name"));
+      if (action === "open-library") {
+        libQuery = "";
+        libEquip = "All";
+        libMuscle = "All";
+        return go("#/library");
+      }
+      if (action === "lib-equip") { libEquip = el.getAttribute("data-value") || "All"; render(); return; }
+      if (action === "lib-muscle") { libMuscle = el.getAttribute("data-value") || "All"; render(); return; }
+      if (action === "add-library") return addFromLibrary(el.getAttribute("data-name"));
+      if (action === "tpl-add-existing") return pickExistingExercise(el.getAttribute("data-name"));
+      if (action === "tpl-add-named") return addNamedFromPicker();
+      if (action === "wo-skip") return skipWorkoutExercise(el.getAttribute("data-id"));
+      if (action === "tpl-target") return changeTemplateTarget(el);
+      if (action === "log-plan") return logPlannedSet(el.getAttribute("data-id"), parseInt(el.getAttribute("data-index"), 10));
+      if (action === "wo-extra-set") return addExtraSet(el.getAttribute("data-id"));
+      if (action === "dismiss-rest") return dismissRest();
       if (action === "delete-template") return deleteTemplate(el.getAttribute("data-id"));
       if (action === "wo-step-w" || action === "wo-step-r") return stepWorkout(action, el);
       if (action === "wo-add-set") return addWorkoutSet(el.getAttribute("data-id"));
@@ -2418,13 +2844,36 @@
       if (code === "42P01" || code === "42703" || code === "PGRST205" || code === "PGRST204") return true;
       return msg.includes("does not exist") || msg.includes("could not find") || msg.includes("schema cache");
     }
+    function clampTarget(n, min, max, fallback) {
+      const v = parseInt(n, 10);
+      if (!Number.isFinite(v)) return fallback;
+      return Math.min(max, Math.max(min, v));
+    }
+    function defaultTarget() { return { sets: 3, reps: 10 }; }
+    function ensureTargets(t) {
+      if (!t) return;
+      if (!Array.isArray(t.targets)) t.targets = [];
+      while (t.targets.length < t.exerciseNames.length) t.targets.push(defaultTarget());
+      if (t.targets.length > t.exerciseNames.length) t.targets = t.targets.slice(0, t.exerciseNames.length);
+      t.targets = t.targets.map(x => ({
+        sets: clampTarget(x && x.sets, 1, 20, 3),
+        reps: clampTarget(x && x.reps, 1, 100, 10)
+      }));
+    }
+    function isMissingColumn(error) {
+      if (!error) return false;
+      const code = String(error.code || "");
+      const msg = String(error.message || "").toLowerCase();
+      return code === "42703" || code === "PGRST204" || (msg.includes("column") && (msg.includes("does not exist") || msg.includes("could not find") || msg.includes("schema cache")));
+    }
     function builtinTemplateRecords() {
       return BUILTIN_TEMPLATES.map(t => ({
         id: "local-" + t.kind,
         name: t.name,
         kind: t.kind,
         position: t.position,
-        exerciseNames: t.names.slice()
+        exerciseNames: t.names.slice(),
+        targets: t.names.map(() => defaultTarget())
       }));
     }
     function readTemplateCache() {
@@ -2454,13 +2903,22 @@
       restoreActive();
     }
     function rowToTemplate(row) {
-      const names = Array.isArray(row.exercise_names) ? row.exercise_names : [];
+      const names = (Array.isArray(row.exercise_names) ? row.exercise_names : []).map(n => String(n));
+      const raw = Array.isArray(row.exercise_targets) ? row.exercise_targets : [];
+      const targets = names.map((name, i) => {
+        const hit = raw.find(x => x && String(x.name || "").toLowerCase() === name.toLowerCase()) || raw[i] || {};
+        return {
+          sets: clampTarget(hit.sets, 1, 20, 3),
+          reps: clampTarget(hit.reps, 1, 100, 10)
+        };
+      });
       return {
         id: row.id,
         name: row.name,
         kind: row.kind || "custom",
         position: row.position || 0,
-        exerciseNames: names.map(n => String(n))
+        exerciseNames: names,
+        targets
       };
     }
     function templateById(id) {
@@ -2477,10 +2935,21 @@
         const raw = localStorage.getItem(activeWorkoutKey());
         if (!raw) { activeWorkout = null; return; }
         const data = JSON.parse(raw);
-        if (!data || !Array.isArray(data.exerciseIds) || !data.exerciseIds.length) {
+        if (data && Array.isArray(data.exerciseIds) && !Array.isArray(data.items)) {
+          data.items = data.exerciseIds.map(id => ({ exerciseId: id, sets: 3, reps: 10, extra: 0 }));
+        }
+        if (data && Array.isArray(data.items) && !Array.isArray(data.exerciseIds)) {
+          data.exerciseIds = data.items.map(item => item.exerciseId);
+        }
+        if (!data || !Array.isArray(data.items) || !data.items.length) {
           activeWorkout = null;
           return;
         }
+        data.items.forEach(item => {
+          item.sets = clampTarget(item.sets, 1, 20, 3);
+          item.reps = clampTarget(item.reps, 1, 100, 10);
+          item.extra = clampTarget(item.extra, 0, 30, 0);
+        });
         activeWorkout = data;
       } catch {
         activeWorkout = null;
@@ -2492,7 +2961,11 @@
     }
     async function loadTemplates() {
       try {
-        const res = await sb.from("templates").select("id,name,kind,position,exercise_names").order("position", { ascending: true });
+        let res = await sb.from("templates").select("id,name,kind,position,exercise_names,exercise_targets").order("position", { ascending: true });
+        if (res.error && isMissingColumn(res.error)) {
+          targetsColumn = false;
+          res = await sb.from("templates").select("id,name,kind,position,exercise_names").order("position", { ascending: true });
+        }
         if (res.error) {
           console.warn(res.error);
           if (!(state.templates || []).length || isMissingSchema(res.error)) useLocalTemplates();
@@ -2526,22 +2999,36 @@
         const id = uid();
         if (t.id) idMap[t.id] = id;
         const kind = ROTATION.indexOf(t.kind) === -1 ? "custom" : t.kind;
-        return {
+        const names = t.exerciseNames || t.names || [];
+        const targets = (t.targets && t.targets.length === names.length)
+          ? names.map((name, n) => ({ name, sets: clampTarget(t.targets[n].sets, 1, 20, 3), reps: clampTarget(t.targets[n].reps, 1, 100, 10) }))
+          : names.map(name => ({ name, sets: 3, reps: 10 }));
+        const row = {
           id,
           user_id: session.user.id,
           name: t.name,
           kind,
           position: t.position != null ? t.position : i,
-          exercise_names: t.exerciseNames || t.names || []
+          exercise_names: names
         };
+        if (targetsColumn) row.exercise_targets = targets;
+        return row;
       });
-      const ins = await sb.from("templates").insert(rows);
+      let ins = await sb.from("templates").insert(rows);
+      if (ins.error && isMissingColumn(ins.error)) {
+        targetsColumn = false;
+        rows.forEach(row => { delete row.exercise_targets; });
+        ins = await sb.from("templates").insert(rows);
+      }
       if (ins.error && ins.error.code !== "23505") console.warn(ins.error);
       if (state.lastTemplateId && idMap[state.lastTemplateId]) {
         state.lastTemplateId = idMap[state.lastTemplateId];
         localStorage.setItem(lastTemplateKey(), state.lastTemplateId);
       }
-      const again = await sb.from("templates").select("id,name,kind,position,exercise_names").order("position", { ascending: true });
+      const againCols = targetsColumn
+        ? "id,name,kind,position,exercise_names,exercise_targets"
+        : "id,name,kind,position,exercise_names";
+      const again = await sb.from("templates").select(againCols).order("position", { ascending: true });
       if (again.error) return [];
       if ((again.data && again.data.length) || (ins.error && ins.error.code === "23505")) {
         localStorage.setItem(templatesSeedKey(), "1");
@@ -2550,15 +3037,32 @@
       return again.data || [];
     }
     async function saveTemplateRecord(t) {
-      const names = t.exerciseNames.map(n => String(n).trim()).filter(Boolean).slice(0, 20);
-      t.exerciseNames = names;
+      const paired = t.exerciseNames.map((n, i) => ({
+        name: String(n).trim(),
+        target: (t.targets && t.targets[i]) || defaultTarget()
+      })).filter(item => item.name).slice(0, 20);
+      t.exerciseNames = paired.map(item => item.name);
+      t.targets = paired.map(item => ({
+        sets: clampTarget(item.target.sets, 1, 20, 3),
+        reps: clampTarget(item.target.reps, 1, 100, 10)
+      }));
+      const names = t.exerciseNames;
       if (templatesMode === "remote" && String(t.id).indexOf("local-") !== 0) {
-        const res = await sb.from("templates").update({
+        const payload = {
           name: t.name,
           kind: t.kind,
           position: t.position,
           exercise_names: names
-        }).eq("id", t.id);
+        };
+        if (targetsColumn) {
+          payload.exercise_targets = names.map((name, i) => ({ name, sets: t.targets[i].sets, reps: t.targets[i].reps }));
+        }
+        let res = await sb.from("templates").update(payload).eq("id", t.id);
+        if (res.error && targetsColumn && isMissingColumn(res.error)) {
+          targetsColumn = false;
+          delete payload.exercise_targets;
+          res = await sb.from("templates").update(payload).eq("id", t.id);
+        }
         if (res.error) {
           if (!isMissingSchema(res.error)) throw asError(res.error, "Couldn't save that template.");
           templatesMode = "local";
@@ -2578,10 +3082,12 @@
       }
       return null;
     }
-    async function ensureExercise(name) {
-      const existing = findExistingExercise(name);
-      if (existing) return existing;
+    async function ensureExercise(name, strict) {
       const clean = String(name || "").trim().slice(0, 60);
+      const existing = strict
+        ? state.exercises.find(e => e.name.toLowerCase() === clean.toLowerCase())
+        : findExistingExercise(clean);
+      if (existing) return existing;
       if (!clean) throw new Error("Give the exercise a name");
       const ex = {
         id: uid(),
@@ -2610,7 +3116,7 @@
             <span class="nm">${escapeHtml(t.name)}</span>
             <span class="sub">${escapeHtml(templateLabel(t) || "No exercises yet")}</span>
           </button>
-          <button type="button" class="mini" data-action="edit-template" data-id="${escapeHtml(t.id)}" aria-label="Edit ${escapeHtml(t.name)}">Edit</button>
+          <button type="button" class="edit-chip" data-action="edit-template" data-id="${escapeHtml(t.id)}" aria-label="Edit ${escapeHtml(t.name)}">${pencilIcon()}<span>Edit</span></button>
         </article>`;
       }).join("");
       const resume = activeWorkout
@@ -2630,49 +3136,19 @@
         <main class="screen"><div class="empty">No workout in progress.</div>
         <button class="add-ex" data-go="#/">Back to list</button></main>`;
       }
-      const blocks = activeWorkout.exerciseIds.map(id => {
-        const ex = exerciseById(id);
-        const name = ex ? ex.name : "Missing exercise";
-        ensureWorkoutDraft(id);
-        const d = workoutDrafts[id];
-        const prior = setsFor(id).filter(s => s.createdAt < activeWorkout.startedAt);
-        const last = prior.length ? prior[prior.length - 1] : null;
-        const lastTxt = last ? `Last: ${fmtWeight(last.weightLbs, true)} × ${last.reps}` : "No sets yet";
-        const sessionSets = setsFor(id).filter(s => s.createdAt >= activeWorkout.startedAt);
-        const logged = sessionSets.map(s => `${fmtWeight(s.weightLbs, true)} × ${s.reps}`).join(" · ");
-        return `<section class="wo-block">
-          <div class="wo-ex-name">${escapeHtml(name)}</div>
-          <div class="wo-last">${escapeHtml(lastTxt)}</div>
-          <div class="logger wo-logger">
-            <div class="logger-grid">
-              <div class="stepper">
-                <div class="unit-lbl">Weight (${unit()})</div>
-                <input id="wo-w-${escapeHtml(id)}" data-draft-weight="${escapeHtml(id)}" inputmode="decimal" type="text" value="${escapeHtml(d.weight)}" aria-label="Weight for ${escapeHtml(name)}">
-                <div class="step-row">
-                  <button type="button" class="step-btn" data-action="wo-step-w" data-id="${escapeHtml(id)}" data-dir="-1" aria-label="Decrease weight for ${escapeHtml(name)}">−</button>
-                  <button type="button" class="step-btn" data-action="wo-step-w" data-id="${escapeHtml(id)}" data-dir="1" aria-label="Increase weight for ${escapeHtml(name)}">+</button>
-                </div>
-              </div>
-              <div class="stepper">
-                <div class="unit-lbl">Reps</div>
-                <input id="wo-r-${escapeHtml(id)}" data-draft-reps="${escapeHtml(id)}" inputmode="numeric" type="text" value="${escapeHtml(d.reps)}" aria-label="Reps for ${escapeHtml(name)}">
-                <div class="step-row">
-                  <button type="button" class="step-btn" data-action="wo-step-r" data-id="${escapeHtml(id)}" data-dir="-1" aria-label="Decrease reps for ${escapeHtml(name)}">−</button>
-                  <button type="button" class="step-btn" data-action="wo-step-r" data-id="${escapeHtml(id)}" data-dir="1" aria-label="Increase reps for ${escapeHtml(name)}">+</button>
-                </div>
-              </div>
-            </div>
-            <button type="button" class="add-set" data-action="wo-add-set" data-id="${escapeHtml(id)}" ${saving ? "disabled" : ""}>Add set</button>
-          </div>
-          ${logged ? `<div class="session-set">This workout: ${escapeHtml(logged)}</div>` : ""}
-        </section>`;
-      }).join("");
+      const items = workoutItems();
+      const progress = workoutProgress(items);
+      const blocks = items.map(item => renderWorkoutExercise(item)).join("");
+      const rest = restMarkup();
       return `<header class="topbar">
           <button class="icon-btn" data-go="#/" aria-label="Back">${backIcon()}</button>
           <h1>${escapeHtml(activeWorkout.name)}</h1>
         </header>
         <main class="screen">
-          ${blocks}
+          <div class="wo-progress">${progress.done}/${progress.total} sets</div>
+          ${rest}
+          ${blocks || `<div class="empty">No exercises left in this workout.</div>`}
+          <button type="button" class="add-ex" data-action="wo-add-open" style="margin-top:4px">+ Add exercise</button>
           <div class="finish-bar">
             <button type="button" class="add-set" data-action="finish-workout">Finish workout</button>
           </div>
@@ -2687,28 +3163,46 @@
         </header>
         <main class="screen"><div class="empty">That template is gone.</div></main>`;
       }
-      const rows = t.exerciseNames.map((name, i) => `<div class="tpl-row">
-        <span class="set-idx">${i + 1}</span>
-        <span class="name">${escapeHtml(name)}</span>
-        <button type="button" class="mini" data-action="tpl-move" data-id="${escapeHtml(t.id)}" data-index="${i}" data-dir="-1" aria-label="Move ${escapeHtml(name)} up">Up</button>
-        <button type="button" class="mini" data-action="tpl-move" data-id="${escapeHtml(t.id)}" data-index="${i}" data-dir="1" aria-label="Move ${escapeHtml(name)} down">Down</button>
-        <button type="button" class="mini danger" data-action="tpl-remove" data-id="${escapeHtml(t.id)}" data-index="${i}" aria-label="Remove ${escapeHtml(name)}">Remove</button>
-      </div>`).join("");
+      ensureTargets(t);
+      const rows = t.exerciseNames.map((name, i) => {
+        const target = t.targets[i];
+        return `<div class="tpl-row">
+        <div class="tpl-line">
+          <span class="grip" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="name">${escapeHtml(name)}</span>
+          <button type="button" class="reorder-btn" data-action="tpl-move" data-id="${escapeHtml(t.id)}" data-index="${i}" data-dir="-1" aria-label="Move ${escapeHtml(name)} up">↑</button>
+          <button type="button" class="reorder-btn" data-action="tpl-move" data-id="${escapeHtml(t.id)}" data-index="${i}" data-dir="1" aria-label="Move ${escapeHtml(name)} down">↓</button>
+          <button type="button" class="icon-x" data-action="tpl-remove" data-id="${escapeHtml(t.id)}" data-index="${i}" aria-label="Remove ${escapeHtml(name)}">×</button>
+        </div>
+        <div class="tpl-targets">
+          <span class="lbl">Sets</span>
+          <button type="button" class="reorder-btn" data-action="tpl-target" data-id="${escapeHtml(t.id)}" data-index="${i}" data-field="sets" data-dir="-1" aria-label="Fewer sets for ${escapeHtml(name)}">−</button>
+          <span class="target-val">${target.sets}</span>
+          <button type="button" class="reorder-btn" data-action="tpl-target" data-id="${escapeHtml(t.id)}" data-index="${i}" data-field="sets" data-dir="1" aria-label="More sets for ${escapeHtml(name)}">+</button>
+          <span class="lbl">Reps</span>
+          <button type="button" class="reorder-btn" data-action="tpl-target" data-id="${escapeHtml(t.id)}" data-index="${i}" data-field="reps" data-dir="-1" aria-label="Fewer reps for ${escapeHtml(name)}">−</button>
+          <span class="target-val">${target.reps}</span>
+          <button type="button" class="reorder-btn" data-action="tpl-target" data-id="${escapeHtml(t.id)}" data-index="${i}" data-field="reps" data-dir="1" aria-label="More reps for ${escapeHtml(name)}">+</button>
+        </div>
+      </div>`;
+      }).join("");
       const del = t.kind === "custom"
         ? `<button type="button" class="add-ex" data-action="delete-template" data-id="${escapeHtml(t.id)}" style="margin-top:16px;color:var(--danger)">Delete template</button>`
         : "";
       return `<header class="topbar">
           <button class="icon-btn" data-go="#/" aria-label="Back">${backIcon()}</button>
-          <h1>Edit</h1>
+          <h1>Edit ${escapeHtml(t.name)}</h1>
         </header>
         <main class="screen">
-          <label class="field-lbl" for="tpl-name">Name</label>
+          <label class="field-lbl" for="tpl-name">Rename template</label>
           <input class="text-input" id="tpl-name" maxlength="40" value="${escapeHtml(t.name)}">
           <button type="button" class="btn primary" data-action="save-template-name" style="width:100%;margin-bottom:16px">Save name</button>
           <div class="eyebrow">Exercises</div>
           ${rows || `<div class="empty">No exercises in this template yet.</div>`}
-          <button type="button" class="add-ex" data-action="tpl-add-open" data-id="${escapeHtml(t.id)}" style="margin-top:8px">+ Add exercise</button>
           ${del}
+          <div class="finish-bar">
+            <button type="button" class="add-set" data-action="tpl-add-open" data-id="${escapeHtml(t.id)}">+ Add exercise</button>
+          </div>
         </main>`;
     }
     function ensureWorkoutDraft(exId) {
@@ -2777,19 +3271,30 @@
       if (!t.exerciseNames.length) { showToast("Add an exercise to this template first"); return; }
       saving = true;
       try {
+        ensureTargets(t);
         const exerciseIds = [];
-        for (const name of t.exerciseNames) {
-          const ex = await ensureExercise(name);
-          if (exerciseIds.indexOf(ex.id) === -1) exerciseIds.push(ex.id);
+        const items = [];
+        for (let i = 0; i < t.exerciseNames.length; i++) {
+          const ex = await ensureExercise(t.exerciseNames[i]);
+          if (exerciseIds.indexOf(ex.id) !== -1) continue;
+          exerciseIds.push(ex.id);
+          items.push({
+            exerciseId: ex.id,
+            sets: t.targets[i].sets,
+            reps: t.targets[i].reps,
+            extra: 0
+          });
         }
         activeWorkout = {
           templateId: t.id,
           name: t.name,
           kind: t.kind,
           exerciseIds,
+          items,
           startedAt: Date.now()
         };
         workoutDrafts = {};
+        planDrafts = {};
         persistActive();
         saving = false;
         go("#/workout");
@@ -2882,11 +3387,17 @@
       if (!t || !Number.isFinite(i)) return;
       const j = i + delta;
       if (j < 0 || j >= t.exerciseNames.length) return;
+      ensureTargets(t);
       const names = t.exerciseNames.slice();
+      const targets = t.targets.slice();
       const swap = names[i];
       names[i] = names[j];
       names[j] = swap;
+      const swapTarget = targets[i];
+      targets[i] = targets[j];
+      targets[j] = swapTarget;
       t.exerciseNames = names;
+      t.targets = targets;
       try {
         await saveTemplateRecord(t);
         render();
@@ -2898,7 +3409,9 @@
       const t = templateById(id);
       const i = parseInt(index, 10);
       if (!t || !Number.isFinite(i)) return;
+      ensureTargets(t);
       t.exerciseNames = t.exerciseNames.filter((_, n) => n !== i);
+      t.targets = t.targets.filter((_, n) => n !== i);
       try {
         await saveTemplateRecord(t);
         render();
@@ -2914,13 +3427,16 @@
         showToast("That exercise is already in the template");
         return;
       }
+      ensureTargets(t);
       t.exerciseNames = t.exerciseNames.concat(clean);
+      t.targets = t.targets.concat([defaultTarget()]);
       try {
         await saveTemplateRecord(t);
         modal = null;
         showToast("Exercise added");
       } catch (err) {
         t.exerciseNames = t.exerciseNames.slice(0, -1);
+        t.targets = t.targets.slice(0, -1);
         showToast(err.message || "Couldn't save that template.");
       }
     }
@@ -2946,6 +3462,367 @@
       go("#/");
     }
 
+
+    function workoutItems() {
+      if (!activeWorkout) return [];
+      if (Array.isArray(activeWorkout.items) && activeWorkout.items.length) return activeWorkout.items;
+      return (activeWorkout.exerciseIds || []).map(id => ({ exerciseId: id, sets: 3, reps: 10, extra: 0 }));
+    }
+    function sessionSetsFor(exId) {
+      if (!activeWorkout) return [];
+      return setsFor(exId).filter(s => s.createdAt >= activeWorkout.startedAt);
+    }
+    function lastSessionSets(exId) {
+      if (!activeWorkout) return [];
+      const prior = setsFor(exId).filter(s => s.createdAt < activeWorkout.startedAt);
+      if (!prior.length) return [];
+      const day = todayKey(prior[prior.length - 1].createdAt);
+      return prior.filter(s => todayKey(s.createdAt) === day);
+    }
+    function workoutProgress(items) {
+      let done = 0;
+      let total = 0;
+      (items || workoutItems()).forEach(item => {
+        const planned = item.sets + (item.extra || 0);
+        const logged = sessionSetsFor(item.exerciseId).length;
+        done += Math.min(logged, planned);
+        total += planned;
+      });
+      return { done, total };
+    }
+    function planKey(exId, index) { return exId + ":" + index; }
+    function ensurePlan(exId, index, fallbackReps) {
+      const key = planKey(exId, index);
+      if (planDrafts[key]) return planDrafts[key];
+      const prior = lastSessionSets(exId);
+      const sample = prior[index] || prior[prior.length - 1];
+      const ex = exerciseById(exId);
+      planDrafts[key] = sample
+        ? { weight: fmtWeight(sample.weightLbs, false), reps: String(sample.reps) }
+        : { weight: startingWeight(ex && ex.name), reps: String(fallbackReps || 10) };
+      return planDrafts[key];
+    }
+    function readPlan(exId, index) {
+      const draft = ensurePlan(exId, index, 10);
+      const w = document.querySelector('[data-plan-weight="' + exId + '"][data-index="' + index + '"]');
+      const r = document.querySelector('[data-plan-reps="' + exId + '"][data-index="' + index + '"]');
+      if (w) draft.weight = w.value;
+      if (r) draft.reps = r.value;
+      return draft;
+    }
+    function formatClock(total) {
+      const s = Math.max(0, total);
+      const m = Math.floor(s / 60);
+      const r = s % 60;
+      return m + ":" + String(r).padStart(2, "0");
+    }
+    function restMarkup() {
+      if (!restUntil || restUntil <= Date.now()) return "";
+      const left = Math.ceil((restUntil - Date.now()) / 1000);
+      return `<div class="rest-bar" id="rest-bar">
+        <div><div class="lbl" style="letter-spacing:.08em">REST</div><div class="time" id="rest-clock">${formatClock(left)}</div></div>
+        <button type="button" data-action="dismiss-rest">Dismiss</button>
+      </div>`;
+    }
+    function startRest() {
+      restUntil = Date.now() + 90000;
+      clearInterval(restTick);
+      restTick = setInterval(() => {
+        const left = Math.ceil((restUntil - Date.now()) / 1000);
+        if (left <= 0) {
+          restUntil = 0;
+          clearInterval(restTick);
+          const bar = document.getElementById("rest-bar");
+          if (bar) bar.remove();
+          return;
+        }
+        const el = document.getElementById("rest-clock");
+        if (el) el.textContent = formatClock(left);
+      }, 250);
+    }
+    function dismissRest() {
+      restUntil = 0;
+      clearInterval(restTick);
+      const bar = document.getElementById("rest-bar");
+      if (bar) bar.remove();
+    }
+    function renderWorkoutExercise(item) {
+      const id = item.exerciseId;
+      const ex = exerciseById(id);
+      const name = ex ? ex.name : "Missing exercise";
+      const planned = item.sets + (item.extra || 0);
+      const logged = sessionSetsFor(id);
+      const rows = [];
+      for (let i = 0; i < planned; i++) {
+        const doneSet = logged[i];
+        if (doneSet) {
+          rows.push(`<div class="set-plan done">
+            <span class="set-no">Set ${i + 1}</span>
+            <span class="done-mark">✓ ${escapeHtml(fmtWeight(doneSet.weightLbs, true))} × ${doneSet.reps}</span>
+          </div>`);
+          continue;
+        }
+        const draft = ensurePlan(id, i, item.reps);
+        const ready = logged.length === i;
+        rows.push(`<div class="set-plan">
+          <span class="set-no">Set ${i + 1}</span>
+          <input class="plan-input" id="plan-w-${escapeHtml(id)}-${i}" data-plan-weight="${escapeHtml(id)}" data-index="${i}" inputmode="decimal" type="text" value="${escapeHtml(draft.weight)}" aria-label="Weight for set ${i + 1} of ${escapeHtml(name)}">
+          <span class="plan-x">×</span>
+          <input class="plan-input reps" id="plan-r-${escapeHtml(id)}-${i}" data-plan-reps="${escapeHtml(id)}" data-index="${i}" inputmode="numeric" type="text" value="${escapeHtml(draft.reps)}" aria-label="Reps for set ${i + 1} of ${escapeHtml(name)}">
+          <button type="button" class="log-btn" data-action="log-plan" data-id="${escapeHtml(id)}" data-index="${i}" ${ready ? "" : "disabled"} aria-label="Log set ${i + 1} of ${escapeHtml(name)}">Log</button>
+        </div>`);
+      }
+      const doneCount = Math.min(logged.length, planned);
+      return `<section class="wo-block">
+        <div class="wo-block-head">
+          <div>
+            <div class="wo-ex-name">${escapeHtml(name)}</div>
+            <div class="wo-last">${doneCount}/${planned} sets</div>
+          </div>
+          <button type="button" class="icon-x" data-action="wo-skip" data-id="${escapeHtml(id)}" aria-label="Skip ${escapeHtml(name)}">×</button>
+        </div>
+        ${rows.join("")}
+        <button type="button" class="add-extra" data-action="wo-extra-set" data-id="${escapeHtml(id)}">+ Add set</button>
+      </section>`;
+    }
+    async function logPlannedSet(exId, index) {
+      if (saving || !activeWorkout || !Number.isFinite(index)) return;
+      const logged = sessionSetsFor(exId);
+      if (logged.length !== index) return;
+      const draft = readPlan(exId, index);
+      const w = parseWeight(draft.weight);
+      const r = parseReps(draft.reps);
+      if (w == null) { showToast("Enter a valid weight"); return; }
+      if (r == null) { showToast("Enter at least 1 rep"); return; }
+      const row = {
+        id: uid(),
+        exerciseId: exId,
+        weightLbs: toLbs(w),
+        reps: r,
+        createdAt: Date.now()
+      };
+      saving = true;
+      state.sets.push(row);
+      try {
+        await persistSetInsert(row, w);
+        startRest();
+        saving = false;
+        showToast("Set " + (index + 1) + " logged");
+      } catch (err) {
+        state.sets = state.sets.filter(s => s.id !== row.id);
+        showToast(err.message || "Couldn't log that set.");
+      } finally {
+        saving = false;
+      }
+    }
+    function addExtraSet(exId) {
+      if (!activeWorkout) return;
+      const items = workoutItems();
+      if (!activeWorkout.items) activeWorkout.items = items;
+      const item = activeWorkout.items.find(i => i.exerciseId === exId);
+      if (!item) return;
+      item.extra = clampTarget((item.extra || 0) + 1, 0, 30, 0);
+      persistActive();
+      render();
+    }
+    function skipWorkoutExercise(id) {
+      if (!activeWorkout || !id) return;
+      const items = workoutItems().filter(item => item.exerciseId !== id);
+      activeWorkout.items = items;
+      activeWorkout.exerciseIds = items.map(item => item.exerciseId);
+      persistActive();
+      render();
+    }
+    function alsoSaveChecked() {
+      const box = document.getElementById("also-save-template");
+      return !!(box && box.checked);
+    }
+    function renderExercisePicker() {
+      const workoutMode = modal.type === "add-workout-exercise";
+      const query = String(modal.query || "").trim().toLowerCase();
+      let exclude = new Set();
+      if (workoutMode && activeWorkout) {
+        workoutItems().forEach(item => {
+          const ex = exerciseById(item.exerciseId);
+          if (ex) exclude.add(ex.name.toLowerCase());
+        });
+      } else {
+        const t = templateById(modal.id);
+        exclude = new Set(((t && t.exerciseNames) || []).map(n => n.toLowerCase()));
+      }
+      const picks = state.exercises
+        .filter(e => !exclude.has(e.name.toLowerCase()))
+        .filter(e => !query || e.name.toLowerCase().indexOf(query) !== -1)
+        .sort((a, b) => a.name.localeCompare(b.name));
+      const list = picks.map(e => `<button type="button" data-action="tpl-add-existing" data-name="${escapeHtml(e.name)}">${escapeHtml(e.name)}</button>`).join("");
+      const owned = new Set(state.exercises.map(e => e.name.toLowerCase()));
+      const libHits = query ? LIBRARY.filter(e => {
+        const key = e.name.toLowerCase();
+        return key.indexOf(query) !== -1 && !exclude.has(key) && !owned.has(key);
+      }).slice(0, 30) : [];
+      const libList = libHits.map(e => `<button type="button" data-action="tpl-add-library" data-name="${escapeHtml(e.name)}">${escapeHtml(e.name)} <span style="color:var(--muted);font-weight:500">· ${escapeHtml(e.equipment)}</span></button>`).join("");
+      const also = workoutMode
+        ? `<label class="also-save"><input type="checkbox" id="also-save-template" ${modal.alsoSave ? "checked" : ""}><span>Also save to template</span></label>`
+        : "";
+      return `<div class="overlay" data-action="close-modal">
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="Add exercise">
+          <div class="grab"></div>
+          <h2>Add exercise</h2>
+          <label class="field-lbl" for="picker-search">Search yours and the library</label>
+          <input class="text-input" id="picker-search" type="search" placeholder="Search" value="${escapeHtml(modal.query || "")}" aria-label="Search exercises">
+          <div class="pick-list">
+            <div class="pick-label">Yours</div>
+            ${list || `<div class="picker-empty">${query ? "No matches in your list." : "No other exercises yet."}</div>`}
+            ${query ? `<div class="pick-label">Library</div>${libList || `<div class="picker-empty">No library matches.</div>`}` : `<div class="picker-empty">Search to add from the gym library.</div>`}
+          </div>
+          ${also}
+          <label class="field-lbl" for="tpl-add-name">Create new exercise</label>
+          <input class="text-input" id="tpl-add-name" maxlength="60" value="${escapeHtml(modal.value || "")}" placeholder="e.g. Cable Fly">
+          <div class="sheet-actions">
+            <button class="btn ghost" data-action="close-modal">Cancel</button>
+            <button class="btn primary" data-action="tpl-add-named">Create and add</button>
+          </div>
+        </div>
+      </div>`;
+    }
+    function pickExistingExercise(name) {
+      if (modal && modal.type === "add-workout-exercise") return addExerciseToWorkout(name, alsoSaveChecked());
+      return addTemplateExercise(modal && modal.id, name);
+    }
+    async function addNamedFromPicker() {
+      const input = document.getElementById("tpl-add-name");
+      const name = (input ? input.value : (modal && modal.value) || "").trim();
+      if (!name) { showToast("Type an exercise name"); return; }
+      if (modal && modal.type === "add-workout-exercise") return addExerciseToWorkout(name, alsoSaveChecked());
+      try {
+        const ex = await ensureExercise(name);
+        return addTemplateExercise(modal && modal.id, ex.name);
+      } catch (err) {
+        showToast(err.message || "Couldn't add that exercise.");
+      }
+    }
+    async function addExerciseToWorkout(name, alsoSave) {
+      if (!activeWorkout) return;
+      try {
+        const ex = await ensureExercise(name);
+        const items = workoutItems();
+        if (!activeWorkout.items) activeWorkout.items = items.slice();
+        if (activeWorkout.items.some(item => item.exerciseId === ex.id)) {
+          showToast("Already in this workout");
+          return;
+        }
+        activeWorkout.items.push({ exerciseId: ex.id, sets: 3, reps: 10, extra: 0 });
+        activeWorkout.exerciseIds = activeWorkout.items.map(item => item.exerciseId);
+        persistActive();
+        if (alsoSave && activeWorkout.templateId) {
+          const t = templateById(activeWorkout.templateId);
+          if (t && !t.exerciseNames.some(n => n.toLowerCase() === ex.name.toLowerCase())) {
+            ensureTargets(t);
+            t.exerciseNames = t.exerciseNames.concat(ex.name);
+            t.targets = t.targets.concat([defaultTarget()]);
+            await saveTemplateRecord(t);
+          }
+        }
+        modal = null;
+        showToast(alsoSave ? "Added to this workout and the template" : "Added to this workout");
+      } catch (err) {
+        showToast(err.message || "Couldn't add that exercise.");
+      }
+    }
+    async function changeTemplateTarget(el) {
+      const t = templateById(el.getAttribute("data-id"));
+      const index = parseInt(el.getAttribute("data-index"), 10);
+      const field = el.getAttribute("data-field");
+      const dir = Number(el.getAttribute("data-dir"));
+      if (!t || !Number.isFinite(index) || (field !== "sets" && field !== "reps")) return;
+      ensureTargets(t);
+      const max = field === "sets" ? 20 : 100;
+      const min = 1;
+      t.targets[index][field] = clampTarget(t.targets[index][field] + dir, min, max, field === "sets" ? 3 : 10);
+      try {
+        await saveTemplateRecord(t);
+        render();
+      } catch (err) {
+        showToast(err.message || "Couldn't save that template.");
+      }
+    }
+
+
+
+    function startingWeight(name) {
+      const hit = libraryEntry(name);
+      if (hit && hit.equipment === "Bodyweight") return "0";
+      return unit() === "kg" ? "20" : "45";
+    }
+    function libraryEntry(name) {
+      const key = String(name || "").trim().toLowerCase();
+      if (!key) return null;
+      return LIBRARY.find(e => e.name.toLowerCase() === key) || null;
+    }
+    function renderLibrary() {
+      const q = libQuery.trim().toLowerCase();
+      const matches = LIBRARY.filter(e => {
+        if (libEquip !== "All" && e.equipment !== libEquip) return false;
+        if (libMuscle !== "All" && e.muscle !== libMuscle) return false;
+        if (q && e.name.toLowerCase().indexOf(q) === -1) return false;
+        return true;
+      });
+      const equipChips = ["All"].concat(EQUIPMENT).map(name =>
+        `<button type="button" class="chip${libEquip === name ? " on" : ""}" data-action="lib-equip" data-value="${escapeHtml(name)}">${escapeHtml(name)}</button>`
+      ).join("");
+      const muscleChips = ["All"].concat(MUSCLES).map(name =>
+        `<button type="button" class="chip${libMuscle === name ? " on" : ""}" data-action="lib-muscle" data-value="${escapeHtml(name)}">${escapeHtml(name)}</button>`
+      ).join("");
+      const groups = [];
+      EQUIPMENT.forEach(eq => {
+        const rows = matches.filter(e => e.equipment === eq);
+        if (!rows.length) return;
+        const buttons = rows.map(e => {
+          const owned = state.exercises.some(x => x.name.toLowerCase() === e.name.toLowerCase());
+          return `<button type="button" class="ex-row" data-action="add-library" data-name="${escapeHtml(e.name)}">
+            <span class="meta"><span class="name">${escapeHtml(e.name)}</span><span class="last">${escapeHtml(e.muscle)}</span></span>
+            <span class="chev">${owned ? "Added" : "Add"}</span>
+          </button>`;
+        }).join("");
+        groups.push(`<section class="lib-group"><div class="eyebrow">${escapeHtml(eq)}</div><div class="ex-list">${buttons}</div></section>`);
+      });
+      return `<header class="topbar">
+          <button class="icon-btn" data-go="#/" aria-label="Back">${backIcon()}</button>
+          <h1>Library</h1>
+        </header>
+        <main class="screen">
+          <label class="field-lbl" for="lib-search">Search</label>
+          <input class="text-input" id="lib-search" type="search" placeholder="Search exercises" value="${escapeHtml(libQuery)}" aria-label="Search library">
+          <div class="chip-row" aria-label="Equipment">${equipChips}</div>
+          <div class="chip-row" aria-label="Muscle group">${muscleChips}</div>
+          <div class="lib-count">${matches.length} exercise${matches.length === 1 ? "" : "s"}</div>
+          ${groups.join("") || `<div class="empty">No exercises match.</div>`}
+        </main>`;
+    }
+    async function addFromLibrary(name) {
+      const clean = String(name || "").trim();
+      if (!clean) return;
+      const existing = state.exercises.find(e => e.name.toLowerCase() === clean.toLowerCase());
+      if (existing) {
+        go("#/exercise/" + encodeURIComponent(existing.id));
+        return;
+      }
+      try {
+        const ex = await ensureExercise(clean, true);
+        showToast(ex.name + " added");
+      } catch (err) {
+        showToast(err.message || "Couldn't add that exercise.");
+      }
+    }
+    async function pickLibraryExercise(name) {
+      try {
+        const ex = await ensureExercise(name, true);
+        if (modal && modal.type === "add-workout-exercise") return addExerciseToWorkout(ex.name, alsoSaveChecked());
+        return addTemplateExercise(modal && modal.id, ex.name);
+      } catch (err) {
+        showToast(err.message || "Couldn't add that exercise.");
+      }
+    }
 
     window.addEventListener("hashchange", () => {
       if (isAuthHash(location.hash)) return;

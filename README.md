@@ -13,4 +13,4 @@ Password reset and email confirmation return to that page. `index.html` loads `@
 
 If this browser still has a Lift Log from before accounts (`localStorage` key `lift-log-v1`), signing in offers a one-time import into that account.
 
-Push / Pull / Legs templates are included. If you ran `supabase/schema.sql` before that feature, paste [`supabase/templates.sql`](supabase/templates.sql) in the SQL editor. Until that table exists, the app still offers the three built-in workouts and keeps template edits in this browser.
+Push / Pull / Legs templates are included. If you ran `supabase/schema.sql` before that feature, paste [`supabase/templates.sql`](supabase/templates.sql) in the SQL editor. Until that table exists, the app still offers the three built-in workouts and keeps template edits in this browser. Set targets (default 3×10) need [`supabase/sets-tracking.sql`](supabase/sets-tracking.sql) if `templates` already existed; without it, workouts still use 3×10.

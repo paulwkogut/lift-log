@@ -174,3 +174,7 @@ create policy templates_update_own on public.templates
 drop policy if exists templates_delete_own on public.templates;
 create policy templates_delete_own on public.templates
   for delete using (user_id = auth.uid());
+
+-- Target sets and reps (same statement as supabase/sets-tracking.sql).
+alter table public.templates
+  add column if not exists exercise_targets jsonb not null default '[]';
