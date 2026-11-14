@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0b0b0d">
-  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" id="theme-color" content="#0b0b0d">
+  <meta name="color-scheme" id="color-scheme" content="dark">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -15,6 +15,29 @@
   <link rel="icon" href="favicon.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
   <title>Lift Log</title>
+  <script>
+    (function () {
+      var mode = "dark", accent = "orange", theme = "dark";
+      try {
+        var raw = JSON.parse(localStorage.getItem("lift-log-theme-v1") || "null") || {};
+        if (raw.mode === "light" || raw.mode === "black" || raw.mode === "system" || raw.mode === "dark") mode = raw.mode;
+        if (/^(orange|blue|green|red|purple|pink|teal|yellow)$/.test(raw.accent)) accent = raw.accent;
+      } catch (e) {}
+      if (mode === "system") theme = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+      else theme = mode;
+      var root = document.documentElement;
+      root.setAttribute("data-theme", theme);
+      root.setAttribute("data-accent", accent);
+      root.setAttribute("data-theme-mode", mode);
+      var bg = theme === "light" ? "#f6f3ee" : theme === "black" ? "#000000" : "#0b0b0d";
+      var themeMeta = document.getElementById("theme-color");
+      var schemeMeta = document.getElementById("color-scheme");
+      var bar = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+      if (themeMeta) themeMeta.setAttribute("content", bg);
+      if (schemeMeta) schemeMeta.setAttribute("content", theme === "light" ? "light" : "dark");
+      if (bar) bar.setAttribute("content", theme === "light" ? "default" : "black-translucent");
+    })();
+  </script>
   <style>
     :root {
       --bg: #0b0b0d;
@@ -32,6 +55,12 @@
       --good-dim: rgba(62, 224, 143, 0.12);
       --danger: #ff5a5a;
       --danger-dim: rgba(255, 90, 90, 0.12);
+      --accent-ink: #1a0a00;
+      --on-good: #04210f;
+      --dash: #3a3a44;
+      --toast-bg: #f4f1ec;
+      --toast-text: #16140f;
+      --overlay: rgba(0, 0, 0, 0.62);
       --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
       --safe-t: env(safe-area-inset-top, 0px);
       --safe-b: env(safe-area-inset-bottom, 0px);
@@ -39,7 +68,62 @@
       --safe-r: env(safe-area-inset-right, 0px);
       --radius: 18px;
       --tap: 52px;
+      color-scheme: dark;
     }
+    :root[data-theme="black"] {
+      --bg: #000000;
+      --bg-elev: #050505;
+      --surface: #101010;
+      --surface-2: #1a1a1a;
+      --line: #2c2c2c;
+      --text: #f5f2ec;
+      --muted: #a39e98;
+      --faint: #6e6a66;
+      --dash: #3a3a3a;
+      --on-good: #04210f;
+      --toast-bg: #f4f1ec;
+      --toast-text: #16140f;
+      --overlay: rgba(0, 0, 0, 0.72);
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+      color-scheme: dark;
+    }
+    :root[data-theme="light"] {
+      --bg: #f6f3ee;
+      --bg-elev: #fffdfb;
+      --surface: #ffffff;
+      --surface-2: #efe8df;
+      --line: #e4dcd2;
+      --text: #1c1612;
+      --muted: #5c564f;
+      --faint: #8a8178;
+      --dash: #d5cdc3;
+      --good: #0b7a45;
+      --good-dim: rgba(11, 122, 69, 0.12);
+      --danger: #c42323;
+      --danger-dim: rgba(196, 35, 35, 0.1);
+      --on-good: #f4fff8;
+      --toast-bg: #1c1612;
+      --toast-text: #f6f3ee;
+      --overlay: rgba(28, 22, 18, 0.46);
+      --shadow: 0 10px 28px rgba(48, 32, 12, 0.08);
+      color-scheme: light;
+    }
+    :root[data-accent="blue"] { --accent: #3b82f6; --accent-ink: #04101f; --accent-2: #bfdbfe; --accent-dim: rgba(59, 130, 246, 0.18); }
+    :root[data-accent="green"] { --accent: #22c55e; --accent-ink: #05210f; --accent-2: #bbf7d0; --accent-dim: rgba(34, 197, 94, 0.18); }
+    :root[data-accent="red"] { --accent: #ef4444; --accent-ink: #2a0606; --accent-2: #fecaca; --accent-dim: rgba(239, 68, 68, 0.18); }
+    :root[data-accent="purple"] { --accent: #a855f7; --accent-ink: #1a0528; --accent-2: #e9d5ff; --accent-dim: rgba(168, 85, 247, 0.2); }
+    :root[data-accent="pink"] { --accent: #ec4899; --accent-ink: #2a0616; --accent-2: #fbcfe8; --accent-dim: rgba(236, 72, 153, 0.18); }
+    :root[data-accent="teal"] { --accent: #14b8a6; --accent-ink: #04221e; --accent-2: #99f6e4; --accent-dim: rgba(20, 184, 166, 0.18); }
+    :root[data-accent="yellow"] { --accent: #eab308; --accent-ink: #1c1402; --accent-2: #fef08a; --accent-dim: rgba(234, 179, 8, 0.2); }
+    :root[data-theme="light"][data-accent="orange"],
+    :root[data-theme="light"]:not([data-accent]) { --accent-2: #c2410c; }
+    :root[data-theme="light"][data-accent="blue"] { --accent-2: #1d4ed8; }
+    :root[data-theme="light"][data-accent="green"] { --accent-2: #047857; }
+    :root[data-theme="light"][data-accent="red"] { --accent-2: #b91c1c; }
+    :root[data-theme="light"][data-accent="purple"] { --accent-2: #7e22ce; }
+    :root[data-theme="light"][data-accent="pink"] { --accent-2: #be185d; }
+    :root[data-theme="light"][data-accent="teal"] { --accent-2: #0f766e; }
+    :root[data-theme="light"][data-accent="yellow"] { --accent-2: #854d0e; }
 
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); }
@@ -106,6 +190,7 @@
       flex-shrink: 0;
       border-radius: 8px;
       background: var(--accent);
+      color: var(--accent-ink);
       display: grid;
       place-items: center;
     }
@@ -174,7 +259,7 @@
       width: 100%;
       min-height: var(--tap);
       border-radius: var(--radius);
-      border: 1.5px dashed #3a3a44;
+      border: 1.5px dashed var(--dash);
       background: var(--bg-elev);
       color: var(--accent-2);
       font-weight: 600;
@@ -240,7 +325,7 @@
     }
 
     .logger {
-      background: linear-gradient(180deg, #1a1a22 0%, var(--surface) 100%);
+      background: linear-gradient(180deg, var(--bg-elev) 0%, var(--surface) 100%);
       border: 1px solid var(--line);
       border-radius: 22px;
       padding: 16px 14px 14px;
@@ -296,7 +381,7 @@
       height: 58px;
       border-radius: 16px;
       background: var(--accent);
-      color: #1a0a00;
+      color: var(--accent-ink);
       font-weight: 800;
       font-size: 17px;
       letter-spacing: 0.02em;
@@ -392,7 +477,7 @@
     }
     .seg button.on {
       background: var(--accent);
-      color: #1a0a00;
+      color: var(--accent-ink);
     }
 
     .hint {
@@ -405,7 +490,7 @@
     .overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.62);
+      background: var(--overlay);
       z-index: 50;
       display: flex;
       align-items: flex-end;
@@ -428,7 +513,7 @@
       width: 40px;
       height: 4px;
       border-radius: 99px;
-      background: #3a3a44;
+      background: var(--line);
       margin: 4px auto 14px;
     }
     .sheet h2 { margin: 0 0 14px; font-size: 18px; letter-spacing: -0.02em; }
@@ -462,7 +547,7 @@
       border-radius: 14px;
       font-weight: 750;
     }
-    .btn.primary { background: var(--accent); color: #1a0a00; }
+    .btn.primary { background: var(--accent); color: var(--accent-ink); }
     .btn.primary:active { filter: brightness(0.92); }
     .btn.ghost { background: var(--surface-2); color: var(--text); }
     .btn.danger { background: var(--danger-dim); color: var(--danger); }
@@ -472,8 +557,8 @@
       left: 50%;
       bottom: calc(96px + var(--safe-b));
       transform: translateX(-50%);
-      background: #f4f1ec;
-      color: #16140f;
+      background: var(--toast-bg);
+      color: var(--toast-text);
       font-weight: 700;
       font-size: 14px;
       padding: 12px 16px;
@@ -511,7 +596,7 @@
     .settings-row .d { overflow-wrap: anywhere; }
 
     .auth-card {
-      background: linear-gradient(180deg, #1a1a22 0%, var(--surface) 100%);
+      background: linear-gradient(180deg, var(--bg-elev) 0%, var(--surface) 100%);
       border: 1px solid var(--line);
       border-radius: 22px;
       padding: 18px 16px 16px;
@@ -740,7 +825,7 @@
       padding: 0 12px;
       border-radius: 12px;
       background: var(--accent);
-      color: #1a0a00;
+      color: var(--accent-ink);
       font-weight: 800;
     }
     .log-btn:disabled { opacity: 0.35; }
@@ -760,12 +845,12 @@
       width: min(440px, calc(100% - 16px));
       z-index: 70;
       background: var(--accent);
-      color: #1a0a00;
+      color: var(--accent-ink);
       border-radius: 22px;
       padding: 16px 14px 12px;
       box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
     }
-    .rest-sheet.done { background: var(--good); }
+    .rest-sheet.done { background: var(--good); color: var(--on-good); }
     .rest-kicker {
       text-align: center;
       font-size: 12px;
@@ -786,10 +871,14 @@
     .rest-controls button, .rest-sheet .ok {
       min-height: 48px;
       border-radius: 14px;
-      background: #1a0a00;
-      color: #ffd7a8;
+      background: var(--accent-ink);
+      color: var(--accent);
       font-weight: 800;
       font-size: 15px;
+    }
+    .rest-sheet.done .rest-controls button, .rest-sheet.done .ok {
+      background: var(--on-good);
+      color: var(--good);
     }
     .rest-sheet .ok { width: 100%; }
     .rest-flash {
@@ -798,8 +887,8 @@
       z-index: 90;
       width: 100%;
       border: 0;
-      background: #ff6a2a;
-      color: #1a0a00;
+      background: var(--accent);
+      color: var(--accent-ink);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -815,8 +904,8 @@
     }
     .rest-flash p { margin: 12px 0 0; font-size: 18px; font-weight: 750; }
     @keyframes restPulse {
-      0%, 100% { background: #ff6a2a; }
-      50% { background: #ffd7a8; }
+      0%, 100% { background: var(--accent); }
+      50% { background: color-mix(in srgb, var(--accent) 68%, white); }
     }
     @media (prefers-reduced-motion: reduce) {
       .rest-flash { animation: none; }
@@ -851,7 +940,123 @@
       font-size: 13px;
       font-weight: 700;
     }
-    .chip.on { background: var(--accent); border-color: var(--accent); color: #1a0a00; }
+    .chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+    .theme-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      padding: 0 16px 16px;
+    }
+    .theme-pick {
+      min-height: 44px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: var(--bg);
+      color: var(--text);
+      font-weight: 700;
+    }
+    .theme-pick.on {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--accent-ink);
+    }
+    .swatches {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 0 16px 16px;
+    }
+    .swatch {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 0;
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28);
+    }
+    .swatch.on {
+      outline: 2px solid var(--text);
+      outline-offset: 3px;
+    }
+    .delete-account {
+      width: 100%;
+      margin: 8px 0 12px;
+      flex: none;
+    }
+    .faq { padding: 0 4px 8px; }
+    .faq h3 { margin: 14px 0 4px; font-size: 15px; letter-spacing: -0.02em; }
+    .faq p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.45; }
+    .tutorial {
+      position: fixed;
+      inset: 0;
+      z-index: 85;
+      background: var(--overlay);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 16px 16px calc(16px + var(--safe-b));
+    }
+    .tutorial-card {
+      width: min(440px, 100%);
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 18px 16px 14px;
+      box-shadow: var(--shadow);
+    }
+    .tutorial-kicker {
+      color: var(--accent-2);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .tutorial-card h2 { margin: 6px 0 8px; font-size: 26px; letter-spacing: -0.04em; line-height: 1.1; }
+    .tutorial-card p { margin: 0 0 14px; color: var(--muted); line-height: 1.45; }
+    .tutorial-art {
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 12px;
+      margin-bottom: 14px;
+    }
+    .tutorial-dots { display: flex; justify-content: center; gap: 8px; margin: 0 0 12px; }
+    .tutorial-dots button {
+      width: 8px;
+      height: 8px;
+      border-radius: 99px;
+      background: var(--line);
+    }
+    .tutorial-dots button.on { background: var(--accent); width: 18px; }
+    .mini-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+    .mini-cards span {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 6px;
+      text-align: center;
+      font-weight: 800;
+      font-size: 13px;
+    }
+    .mini-cards span.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+    .fake-log { display: flex; gap: 6px; align-items: center; }
+    .fake-log b {
+      flex: 1;
+      text-align: center;
+      background: var(--surface-2);
+      border-radius: 10px;
+      padding: 8px 0;
+    }
+    .fake-log em {
+      background: var(--accent);
+      color: var(--accent-ink);
+      font-style: normal;
+      font-weight: 800;
+      border-radius: 10px;
+      padding: 8px 12px;
+    }
+    .fake-clock { text-align: center; font-size: 42px; font-weight: 800; letter-spacing: -0.05em; color: var(--accent); }
+    .fake-chart { height: 36px; border-radius: 8px; background: linear-gradient(90deg, var(--accent-dim), var(--accent)); }
     .lib-count { color: var(--muted); font-size: 12px; margin: 0 2px 8px; }
     .lib-group { margin-bottom: 8px; }
     .pick-label { color: var(--muted); font-size: 11px; font-weight: 750; letter-spacing: 0.07em; text-transform: uppercase; margin: 4px 2px; }
@@ -861,7 +1066,7 @@
       margin-bottom: 8px;
       border-radius: 14px;
       background: var(--accent);
-      color: #1a0a00;
+      color: var(--accent-ink);
       font-weight: 800;
     }
     .new-template { margin: 4px 0 18px; }
@@ -916,6 +1121,8 @@
   (function () {
     const SUPABASE_URL = "https://iogspfmaiiurwgjjjteq.supabase.co";
     const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_JSGO5NWKQlyYPv8a60sLaQ_0UxNc7oc";
+    const VAPID_PUBLIC_KEY = "BI46BaO5xrn74UjRPtjXfYZeKcCVhQbQ6NK1GgQjAeTVCQic-WiYvjA-qaEYIz4omQhGZaSsbezuRHH1ETUnKtU";
+    const REST_SESSION_KEY = "lift-log-rest-session-v1";
     const LEGACY_KEY = "lift-log-v1";
     const LB_PER_KG = 2.2046226218;
     const DEFAULT_NAMES = [
@@ -1188,7 +1395,37 @@
     let restTick = 0;
     let restAlerted = false;
     let audioCtx = null;
-    let restSettings = { auto: true, sound: true, seconds: 90, overrides: {} };
+    const THEME_KEY = "lift-log-theme-v1";
+    const ACCENTS = [
+      ["orange", "Orange", "#ff6a2a"],
+      ["blue", "Blue", "#3b82f6"],
+      ["green", "Green", "#22c55e"],
+      ["red", "Red", "#ef4444"],
+      ["purple", "Purple", "#a855f7"],
+      ["pink", "Pink", "#ec4899"],
+      ["teal", "Teal", "#14b8a6"],
+      ["yellow", "Yellow", "#eab308"]
+    ];
+    let themeChoice = { mode: "dark", accent: "orange" };
+    const TUTORIAL_KEY = "lift-log-tutorial-v1";
+    const TUTORIAL_STEPS = [
+      ["Workouts", "Start with Push, Pull, or Legs", "On Home, tap a workout card. After you finish, the next day moves to Pull, then Legs, then Push again.", "workouts"],
+      ["Logging", "Log weight and reps", "Use the − and + steppers, then tap Log. A weight of 0 is bodyweight and shows as BW.", "log"],
+      ["Rest", "Rest, then the next set", "A countdown starts after every logged set. Change it by 15 seconds, pause, or skip. When it ends, the screen flashes in your accent color.", "rest"],
+      ["Templates", "Make the workout yours", "Edit a template to rename, reorder, or remove exercises. Add from the library, or type a new name.", "template"],
+      ["History", "See what you lifted", "Open an exercise for each set, your bests, and a chart of top weight over time.", "history"],
+      ["iPhone", "Add Lift Log to your Home Screen", "In Safari, tap Share, then Add to Home Screen. Lock-screen rest alerts only work from that icon.", "home"],
+      ["Settings", "Tune it for this phone", "Change units, rest time, and the beep. Pick a theme and accent, keep the screen awake, or turn on lock-screen alerts.", "settings"]
+    ];
+    let tutorialOpen = false;
+    let tutorialStep = 0;
+    let accountJustDeleted = false;
+    let restSettings = { auto: true, sound: true, wake: true, push: false, seconds: 90, overrides: {} };
+    let screenLock = null;
+    let screenLockPending = false;
+    let screenLockHold = false;
+    let restPushQueue = Promise.resolve();
+    let restPushMissing = false;
     let libQuery = "";
     let libEquip = "All";
     let libMuscle = "All";
@@ -1492,6 +1729,7 @@
         loading = false;
         bootError = "";
         offerMigration();
+        maybeOpenTutorial();
         render();
       } catch (err) {
         if (seq !== loadSeq) return;
@@ -1712,6 +1950,9 @@
         restSession = null;
         restAlerted = false;
         clearInterval(restTick);
+        try { localStorage.removeItem(REST_SESSION_KEY); } catch {}
+        screenLockHold = false;
+        syncScreenLock();
         templatesMode = "local";
         modal = null;
         draft = { weight: "", reps: "" };
@@ -1721,7 +1962,13 @@
         authResolved = true;
         authBusy = false;
         authMode = "login";
-        authNotice = "";
+        tutorialOpen = false;
+        if (accountJustDeleted) {
+          authNotice = "Your account was deleted";
+          accountJustDeleted = false;
+        } else {
+          authNotice = "";
+        }
         authForm.password = "";
         authForm.password2 = "";
         if (failedRecovery) {
@@ -1763,7 +2010,7 @@
         " L" + coords[0][0].toFixed(1) + " " + (h - padB) + " Z";
       const dots = coords.map((c, i) => {
         const last = i === coords.length - 1;
-        return `<circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="${last ? 4.5 : 3.2}" fill="${last ? "#ff6a2a" : "#ffd7a8"}" />`;
+        return `<circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="${last ? 4.5 : 3.2}" fill="${last ? "var(--accent)" : "var(--accent-2)"}" />`;
       }).join("");
       const lastPt = coords[coords.length - 1];
       const lastVal = fmtWeight(points[points.length - 1].weightLbs, false);
@@ -1772,14 +2019,14 @@
       const firstLbl = points[0].date.slice(5);
       const lastLbl = points[points.length - 1].date.slice(5);
       const dateLabels = firstLbl === lastLbl
-        ? `<text x="${w / 2}" y="${h - 6}" fill="#8d8a86" font-size="10" text-anchor="middle">${escapeHtml(firstLbl)}</text>`
-        : `<text x="${padL}" y="${h - 6}" fill="#8d8a86" font-size="10">${escapeHtml(firstLbl)}</text>
-        <text x="${w - padR}" y="${h - 6}" fill="#8d8a86" font-size="10" text-anchor="end">${escapeHtml(lastLbl)}</text>`;
+        ? `<text x="${w / 2}" y="${h - 6}" fill="var(--muted)" font-size="10" text-anchor="middle">${escapeHtml(firstLbl)}</text>`
+        : `<text x="${padL}" y="${h - 6}" fill="var(--muted)" font-size="10">${escapeHtml(firstLbl)}</text>
+        <text x="${w - padR}" y="${h - 6}" fill="var(--muted)" font-size="10" text-anchor="end">${escapeHtml(lastLbl)}</text>`;
       return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="Top set weight over time">
-        <path d="${area}" fill="rgba(255,106,42,0.14)"></path>
-        <path d="${line}" fill="none" stroke="#ff6a2a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="${area}" fill="var(--accent-dim)"></path>
+        <path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path>
         ${dots}
-        <text x="${valX.toFixed(1)}" y="${Math.max(12, lastPt[1] - 10).toFixed(1)}" fill="#ffd7a8" font-size="11" font-weight="700" text-anchor="${valAnchor}">${escapeHtml(lastVal)}</text>
+        <text x="${valX.toFixed(1)}" y="${Math.max(12, lastPt[1] - 10).toFixed(1)}" fill="var(--accent-2)" font-size="11" font-weight="700" text-anchor="${valAnchor}">${escapeHtml(lastVal)}</text>
         ${dateLabels}
       </svg>`;
     }
@@ -1819,6 +2066,7 @@
 
       const showModal = screen !== "auth" && screen !== "loading" && screen !== "recovery" && screen !== "error";
       if (showModal && modal) html += renderModal();
+      if (tutorialOpen && session && screen !== "loading" && screen !== "auth") html += renderTutorial();
       if (toastMsg) html += `<div class="toast" role="status">${escapeHtml(toastMsg)}</div>`;
       if (session && restSession && screen !== "loading" && screen !== "auth" && screen !== "recovery") html += restSheetHtml();
       appEl.innerHTML = html;
@@ -1833,6 +2081,7 @@
         focusAuthField = "";
         if (preferred) {
           preferred.focus();
+          syncScreenLock();
           return;
         }
       }
@@ -1847,6 +2096,7 @@
       } else {
         window.scrollTo(0, scrollY);
       }
+      syncScreenLock();
     }
 
     function hydrateAuthFields() {
@@ -2138,6 +2388,27 @@
               </div>
             </div>
           </div>
+          <div class="eyebrow">Appearance</div>
+          <div class="settings-card">
+            <div class="settings-row">
+              <div>
+                <div class="k">Theme</div>
+                <div class="d">${themeChoice.mode === "system" ? "Follows this phone's light or dark setting" : "Used for the whole app"}</div>
+              </div>
+            </div>
+            <div class="theme-grid" role="group" aria-label="Theme">
+              ${[["dark", "Dark"], ["light", "Light"], ["black", "Black"], ["system", "Match system"]].map(([id, label]) => `<button type="button" class="theme-pick${themeChoice.mode === id ? " on" : ""}" data-action="set-theme" data-mode="${id}">${label}</button>`).join("")}
+            </div>
+            <div class="settings-row">
+              <div>
+                <div class="k">Accent</div>
+                <div class="d">Buttons, charts, and the rest flash</div>
+              </div>
+            </div>
+            <div class="swatches" role="group" aria-label="Accent color">
+              ${ACCENTS.map(([id, label, hex]) => `<button type="button" class="swatch${themeChoice.accent === id ? " on" : ""}" data-action="set-accent" data-accent="${id}" style="background:${hex}" aria-label="${label}"></button>`).join("")}
+            </div>
+          </div>
           <div class="eyebrow">Rest timer</div>
           <div class="settings-card">
             <div class="settings-row">
@@ -2177,6 +2448,29 @@
               </div>
             </button>
           </div>
+          <div class="eyebrow">During a workout</div>
+          <div class="settings-card">
+            <div class="settings-row">
+              <div>
+                <div class="k">Keep screen awake during workouts</div>
+                <div class="d">While a workout or rest timer is running.</div>
+              </div>
+              <div class="seg" role="group" aria-label="Keep screen awake during workouts">
+                <button data-action="wake-lock" data-on="1" class="${restSettings.wake !== false ? "on" : ""}">On</button>
+                <button data-action="wake-lock" data-on="0" class="${restSettings.wake !== false ? "" : "on"}">Off</button>
+              </div>
+            </div>
+            <div class="settings-row">
+              <div>
+                <div class="k">Lock-screen alerts</div>
+                <div class="d">${lockScreenHint()}</div>
+              </div>
+              <div class="seg" role="group" aria-label="Lock-screen alerts">
+                <button data-action="push-alerts" data-on="1" class="${restSettings.push ? "on" : ""}">On</button>
+                <button data-action="push-alerts" data-on="0" class="${restSettings.push ? "" : "on"}">Off</button>
+              </div>
+            </div>
+          </div>
           <div class="eyebrow">Backup</div>
           <div class="settings-card">
             <button class="settings-row tappable" data-action="export-json">
@@ -2196,12 +2490,108 @@
           </div>
           <input id="import-file" type="file" accept="application/json,.json" hidden>
           <p class="hint">Your sets are saved to this account. Export a backup anytime.</p>
+          <div class="eyebrow">Help</div>
+          <div class="settings-card">
+            <button class="settings-row tappable" data-action="show-tutorial">
+              <div>
+                <div class="k">How to use Lift Log</div>
+                <div class="d">A short walkthrough you can replay</div>
+              </div>
+            </button>
+          </div>
+          <div class="faq">
+            <h3>Why doesn't my iPhone vibrate?</h3>
+            <p>iPhones don't let a website vibrate. When rest ends you get a beep and a full-screen flash.</p>
+            <h3>Why is the beep silent?</h3>
+            <p>The silent switch mutes the beep. The flash still shows, and other music keeps playing. Turn Rest alert sound off if you only want the flash.</p>
+            <h3>How do I bring in old logs?</h3>
+            <p>If this phone still has logs from before accounts, signing in offers a one-time import. You can also use Import JSON above.</p>
+            <h3>How do I delete my account?</h3>
+            <p>Use Delete account below. Export a backup first if you want one, then type DELETE. That removes the account and every log.</p>
+          </div>
+          <button type="button" class="btn danger delete-account" data-action="delete-account-open">Delete account</button>
           ${iosInstallTip()}
         </main>`;
     }
 
+    function tutorialArt(kind) {
+      if (kind === "workouts") return `<div class="mini-cards"><span class="on">Push</span><span>Pull</span><span>Legs</span></div>`;
+      if (kind === "log") return `<div class="fake-log"><b>135</b><b>×</b><b>5</b><em>Log</em></div>`;
+      if (kind === "rest") return `<div class="fake-clock">1:30</div>`;
+      if (kind === "template") return `<div class="mini-cards"><span>Bench</span><span class="on">+ Add</span><span>Library</span></div>`;
+      if (kind === "history") return `<div class="fake-chart" role="img" aria-label="A rising chart"></div>`;
+      if (kind === "home") return `<div class="mini-cards"><span>Share</span><span class="on">Add</span><span>Home</span></div>`;
+      return `<div class="mini-cards"><span>Units</span><span class="on">Theme</span><span>Rest</span></div>`;
+    }
+    function renderTutorial() {
+      const step = TUTORIAL_STEPS[tutorialStep] || TUTORIAL_STEPS[0];
+      const last = tutorialStep === TUTORIAL_STEPS.length - 1;
+      const dots = TUTORIAL_STEPS.map((_, i) => `<button type="button" class="${i === tutorialStep ? "on" : ""}" data-action="tutorial-go" data-step="${i}" aria-label="Step ${i + 1} of ${TUTORIAL_STEPS.length}"></button>`).join("");
+      return `<div class="tutorial" id="tutorial">
+        <div class="tutorial-card" role="dialog" aria-modal="true" aria-label="How to use Lift Log">
+          <div class="tutorial-kicker">${step[0]}</div>
+          <h2>${step[1]}</h2>
+          <div class="tutorial-art">${tutorialArt(step[3])}</div>
+          <p>${step[2]}</p>
+          <div class="tutorial-dots">${dots}</div>
+          <div class="sheet-actions">
+            ${tutorialStep ? `<button type="button" class="btn ghost" data-action="tutorial-back">Back</button>` : `<button type="button" class="btn ghost" data-action="tutorial-skip">Skip</button>`}
+            <button type="button" class="btn primary" data-action="tutorial-next">${last ? "Done" : "Next"}</button>
+          </div>
+        </div>
+      </div>`;
+    }
+    function tutorialSeen() {
+      try { return localStorage.getItem(TUTORIAL_KEY) === "1"; } catch { return true; }
+    }
+    function markTutorialSeen() {
+      try { localStorage.setItem(TUTORIAL_KEY, "1"); } catch {}
+    }
+    function maybeOpenTutorial() {
+      if (tutorialSeen() || tutorialOpen) return;
+      if (modal && modal.type === "migrate-local") return;
+      tutorialOpen = true;
+      tutorialStep = 0;
+    }
+    function closeTutorial() {
+      tutorialOpen = false;
+      markTutorialSeen();
+      render();
+    }
+    function tutorialNext() {
+      if (tutorialStep >= TUTORIAL_STEPS.length - 1) return closeTutorial();
+      tutorialStep += 1;
+      render();
+    }
+    function tutorialBack() {
+      tutorialStep = Math.max(0, tutorialStep - 1);
+      render();
+    }
     function renderModal() {
       if (!modal) return "";
+      if (modal.type === "delete-account") {
+        const phrase = modal.phrase || "";
+        const ready = phrase.trim() === "DELETE" && !modal.busy;
+        return `<div class="overlay" data-action="close-modal">
+          <div class="sheet" role="dialog" aria-modal="true" aria-label="Delete account">
+            <div class="grab"></div>
+            <h2>Delete account?</h2>
+            <p class="hint">This permanently deletes the account and all logs, exercises, templates, and settings. This cannot be undone.</p>
+            <button type="button" class="settings-row tappable" data-action="export-json">
+              <div>
+                <div class="k">Export my data first</div>
+                <div class="d">Download a JSON backup before deleting</div>
+              </div>
+            </button>
+            <label class="field-lbl" for="delete-confirm">Type DELETE to confirm</label>
+            <input class="text-input" id="delete-confirm" autocomplete="off" autocapitalize="characters" value="${escapeHtml(phrase)}" ${modal.busy ? "disabled" : ""}>
+            <div class="sheet-actions">
+              <button type="button" class="btn ghost" data-action="close-modal" ${modal.busy ? "disabled" : ""}>Cancel</button>
+              <button type="button" class="btn danger" id="delete-account-go" data-action="delete-account" ${ready ? "" : "disabled"}>Delete account</button>
+            </div>
+          </div>
+        </div>`;
+      }
       if (modal.type === "new-template") {
         return `<div class="overlay" data-action="close-modal">
           <div class="sheet" role="dialog" aria-modal="true" aria-label="New template">
@@ -2330,11 +2720,11 @@
 
     function barbellIcon() {
       return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-        <rect x="2" y="8" width="3.2" height="8" rx="1" fill="#1a0a00"/>
-        <rect x="18.8" y="8" width="3.2" height="8" rx="1" fill="#1a0a00"/>
-        <rect x="5.4" y="9.5" width="2" height="5" rx="0.6" fill="#1a0a00"/>
-        <rect x="16.6" y="9.5" width="2" height="5" rx="0.6" fill="#1a0a00"/>
-        <rect x="7.6" y="11" width="8.8" height="2" rx="0.6" fill="#1a0a00"/>
+        <rect x="2" y="8" width="3.2" height="8" rx="1" fill="currentColor"/>
+        <rect x="18.8" y="8" width="3.2" height="8" rx="1" fill="currentColor"/>
+        <rect x="5.4" y="9.5" width="2" height="5" rx="0.6" fill="currentColor"/>
+        <rect x="16.6" y="9.5" width="2" height="5" rx="0.6" fill="currentColor"/>
+        <rect x="7.6" y="11" width="8.8" height="2" rx="0.6" fill="currentColor"/>
       </svg>`;
     }
     function gearIcon() {
@@ -2478,6 +2868,33 @@
         e.preventDefault();
         submitNewPassword();
       });
+      const tutorial = document.getElementById("tutorial");
+      if (tutorial) {
+        let startX = 0, startY = 0, tracking = false;
+        tutorial.addEventListener("pointerdown", (e) => {
+          if (e.target.closest("button")) return;
+          tracking = true;
+          startX = e.clientX;
+          startY = e.clientY;
+        });
+        tutorial.addEventListener("pointerup", (e) => {
+          if (!tracking) return;
+          tracking = false;
+          const dx = e.clientX - startX;
+          const dy = e.clientY - startY;
+          if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy)) return;
+          if (dx < 0) tutorialNext();
+          else tutorialBack();
+        });
+      }
+      const deleteConfirm = document.getElementById("delete-confirm");
+      if (deleteConfirm && modal && modal.type === "delete-account") {
+        deleteConfirm.addEventListener("input", () => {
+          modal.phrase = deleteConfirm.value;
+          const goBtn = document.getElementById("delete-account-go");
+          if (goBtn) goBtn.disabled = deleteConfirm.value.trim() !== "DELETE";
+        });
+      }
       ["auth-email", "auth-password", "auth-password2"].forEach(id => {
         const input = document.getElementById(id);
         if (!input) return;
@@ -2495,7 +2912,10 @@
     }
 
     async function handleAction(action, el) {
-      if (action === "close-modal") return closeModal();
+      if (action === "close-modal") {
+        if (modal && modal.busy) return;
+        return closeModal();
+      }
       if (action === "auth-mode") {
         authMode = el.getAttribute("data-mode") || "login";
         authError = "";
@@ -2525,9 +2945,28 @@
       if (action === "migrate-dismiss") {
         localStorage.setItem(migrationFlag(), "dismissed");
         modal = null;
+        maybeOpenTutorial();
         render();
         return;
       }
+      if (action === "show-tutorial") {
+        tutorialOpen = true;
+        tutorialStep = 0;
+        return render();
+      }
+      if (action === "tutorial-next") return tutorialNext();
+      if (action === "tutorial-back") return tutorialBack();
+      if (action === "tutorial-skip") return closeTutorial();
+      if (action === "tutorial-go") {
+        const n = parseInt(el.getAttribute("data-step"), 10);
+        if (Number.isFinite(n)) tutorialStep = Math.max(0, Math.min(TUTORIAL_STEPS.length - 1, n));
+        return render();
+      }
+      if (action === "delete-account-open") {
+        modal = { type: "delete-account", phrase: "" };
+        return render();
+      }
+      if (action === "delete-account") return deleteAccount();
       if (action === "migrate-import") return migrateImport();
       if (action === "add-exercise") {
         modal = { type: "add-exercise", value: "" };
@@ -2574,6 +3013,8 @@
       if (action === "save-set") return saveSetEdit();
       if (action === "delete-set") return deleteSet(el.getAttribute("data-id"));
       if (action === "set-unit") return setUnit(el.getAttribute("data-unit"));
+      if (action === "set-theme") return setThemeMode(el.getAttribute("data-mode"));
+      if (action === "set-accent") return setAccent(el.getAttribute("data-accent"));
       if (action === "export-json") return exportJson();
       if (action === "import-json") return chooseImportFile();
       if (action === "do-import") return doImport();
@@ -2618,6 +3059,8 @@
       if (action === "rest-adjust") return adjustRest(Number(el.getAttribute("data-dir")));
       if (action === "rest-auto") return setRestAuto(el.getAttribute("data-on") === "1");
       if (action === "rest-sound") return setRestSound(el.getAttribute("data-on") === "1");
+      if (action === "wake-lock") return setWakeLock(el.getAttribute("data-on") === "1");
+      if (action === "push-alerts") return setPushAlerts(el.getAttribute("data-on") === "1");
       if (action === "rest-default") return setDefaultRest(Number(el.getAttribute("data-dir")));
       if (action === "rest-ex") return setExerciseRest(el.getAttribute("data-name"), Number(el.getAttribute("data-dir")));
       if (action === "rest-ex-clear") return clearExerciseRest(el.getAttribute("data-name"));
@@ -2779,6 +3222,7 @@
       const r = parseReps(draft.reps);
       if (w == null) { showToast("Enter a valid weight"); return; }
       if (r == null) { showToast("Enter at least 1 rep"); return; }
+      primeScreenLock();
       const row = {
         id: uid(),
         exerciseId: route.id,
@@ -2801,6 +3245,8 @@
         showToast(err.message || "Couldn't log that set.");
       } finally {
         saving = false;
+        screenLockHold = false;
+        syncScreenLock();
       }
     }
 
@@ -2863,6 +3309,58 @@
       }
     }
 
+    function deletionNotReady(error) {
+      if (!error) return false;
+      if (isMissingSchema(error)) return true;
+      const code = String(error.code || "");
+      const msg = String(error.message || "").toLowerCase();
+      return code === "PGRST202" || code === "42883" || msg.includes("delete_my_account");
+    }
+    function clearAppStorage() {
+      const drop = [];
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (key === LEGACY_KEY || key.indexOf("lift-log-") === 0)) drop.push(key);
+        }
+      } catch {}
+      drop.forEach(key => { try { localStorage.removeItem(key); } catch {} });
+      themeChoice = { mode: "dark", accent: "orange" };
+      applyTheme();
+      restSession = null;
+      restAlerted = false;
+      clearInterval(restTick);
+      screenLockHold = false;
+      try { releaseScreenLock(); } catch {}
+    }
+    async function deleteAccount() {
+      if (!modal || modal.type !== "delete-account" || modal.busy) return;
+      const typed = (document.getElementById("delete-confirm") || {}).value || modal.phrase || "";
+      if (String(typed).trim() !== "DELETE") return;
+      modal.phrase = String(typed);
+      modal.busy = true;
+      render();
+      try {
+        const { error } = await sb.rpc("delete_my_account");
+        if (error) {
+          modal.busy = false;
+          if (deletionNotReady(error)) {
+            showToast("Account deletion isn't set up yet");
+            return;
+          }
+          showToast(error.message || "Couldn't delete the account.");
+          return;
+        }
+        clearAppStorage();
+        accountJustDeleted = true;
+        modal = null;
+        tutorialOpen = false;
+        await sb.auth.signOut();
+      } catch (err) {
+        if (modal) modal.busy = false;
+        showToast((err && err.message) || "Couldn't delete the account.");
+      }
+    }
     function exportJson() {
       const payload = {
         version: 2,
@@ -3369,6 +3867,7 @@
       const r = parseReps(workoutDrafts[exId].reps);
       if (w == null) { showToast("Enter a valid weight"); return; }
       if (r == null) { showToast("Enter at least 1 rep"); return; }
+      primeScreenLock();
       const row = {
         id: uid(),
         exerciseId: exId,
@@ -3390,6 +3889,8 @@
         showToast(err.message || "Couldn't log that set.");
       } finally {
         saving = false;
+        screenLockHold = false;
+        syncScreenLock();
       }
     }
     async function startTemplate(id) {
@@ -3397,6 +3898,7 @@
       const t = templateById(id);
       if (!t) return;
       if (!t.exerciseNames.length) { showToast("Add an exercise to this template first"); return; }
+      primeScreenLock();
       saving = true;
       try {
         ensureTargets(t);
@@ -3430,6 +3932,8 @@
         saving = false;
         showToast(err.message || "Couldn't start that workout.");
       }
+      screenLockHold = false;
+      syncScreenLock();
     }
     async function finishWorkout() {
       if (!activeWorkout) return go("#/");
@@ -3444,6 +3948,7 @@
       workoutDrafts = {};
       persistActive();
       cacheTemplates();
+      screenLockHold = false;
       showToast("Workout finished");
       go("#/");
     }
@@ -3651,11 +4156,13 @@
         restSettings = {
           auto: raw.auto !== false,
           sound: raw.sound !== false,
+          wake: raw.wake !== false,
+          push: raw.push === true,
           seconds: clampTarget(raw.seconds, 30, 300, 90),
           overrides
         };
       } catch {
-        restSettings = { auto: true, sound: true, seconds: 90, overrides: {} };
+        restSettings = { auto: true, sound: true, wake: true, push: false, seconds: 90, overrides: {} };
       }
     }
     function saveRestSettings() {
@@ -3767,8 +4274,11 @@
       restSession.phase = "done";
       if (document.visibilityState === "hidden") {
         restSession.pendingAlert = true;
+        persistRestSession();
         return;
       }
+      persistRestSession();
+      enqueueRestPush({ action: "cancel" });
       fireRestAlert();
       render();
     }
@@ -3779,6 +4289,8 @@
       if (restSession.pendingAlert || ended) {
         restSession.phase = "done";
         restSession.pendingAlert = false;
+        persistRestSession();
+        enqueueRestPush({ action: "cancel" });
         fireRestAlert();
         render();
       }
@@ -3797,17 +4309,227 @@
       clearInterval(restTick);
       restTick = setInterval(syncRest, 250);
     }
+
+    function wakeWanted() {
+      if (restSettings.wake === false) return false;
+      return !!activeWorkout || !!restSession || screenLockHold;
+    }
+    function releaseScreenLock() {
+      const lock = screenLock;
+      screenLock = null;
+      if (!lock) return;
+      try {
+        const released = lock.release();
+        if (released && released.catch) released.catch(() => {});
+      } catch {}
+    }
+    function acquireScreenLock() {
+      if (restSettings.wake === false || document.visibilityState !== "visible") return;
+      if (screenLock || screenLockPending) return;
+      const api = navigator.wakeLock;
+      if (!api || !api.request) return;
+      screenLockPending = true;
+      let pending;
+      try { pending = api.request("screen"); }
+      catch { screenLockPending = false; return; }
+      Promise.resolve(pending).then(lock => {
+        const keep = restSettings.wake !== false && document.visibilityState === "visible" && (!!activeWorkout || !!restSession || screenLockHold);
+        if (!keep) {
+          try { lock.release(); } catch {}
+          return;
+        }
+        screenLock = lock;
+        if (lock.addEventListener) lock.addEventListener("release", () => {
+          if (screenLock === lock) screenLock = null;
+        });
+      }).catch(() => {}).finally(() => { screenLockPending = false; });
+    }
+    function primeScreenLock() {
+      if (restSettings.wake === false) return;
+      screenLockHold = true;
+      acquireScreenLock();
+    }
+    function syncScreenLock() {
+      if ((activeWorkout || restSession) && screenLockHold) screenLockHold = false;
+      if (!wakeWanted() || document.visibilityState !== "visible") {
+        if (!wakeWanted()) releaseScreenLock();
+        return;
+      }
+      acquireScreenLock();
+    }
+    function setWakeLock(on) {
+      restSettings.wake = !!on;
+      if (!on) screenLockHold = false;
+      saveRestSettings();
+      render();
+    }
+    function homeScreenRequired() {
+      const ua = navigator.userAgent || "";
+      const ios = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      if (!ios) return false;
+      return !(window.navigator.standalone === true || window.matchMedia("(display-mode: standalone)").matches);
+    }
+    function lockScreenHint() {
+      if (homeScreenRequired()) return "Add to Home Screen first. iPhone only delivers these from the home-screen app.";
+      if (typeof Notification !== "undefined" && Notification.permission === "denied") return "Notifications are blocked. Allow them for Lift Log, then turn this on.";
+      return "Sends a Rest over alert when the timer ends, even if the phone is locked. The on-screen timer still works if this is off.";
+    }
+    function vapidKeyBytes(key) {
+      const pad = "=".repeat((4 - key.length % 4) % 4);
+      const b64 = (key + pad).replace(/-/g, "+").replace(/_/g, "/");
+      const raw = atob(b64);
+      const out = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+      return out;
+    }
+    async function postRestAlert(body) {
+      if (restPushMissing || !session) return;
+      try {
+        const { data } = await sb.auth.getSession();
+        const token = data && data.session && data.session.access_token;
+        if (!token) return;
+        const res = await fetch(SUPABASE_URL + "/functions/v1/rest-alert", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + token,
+            apikey: SUPABASE_PUBLISHABLE_KEY,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(body)
+        });
+        if (res.status === 404) restPushMissing = true;
+      } catch {}
+    }
+    function enqueueRestPush(body) {
+      if (!restSettings.push) return;
+      restPushQueue = restPushQueue.then(() => postRestAlert(body)).catch(() => {});
+    }
+    function persistRestSession() {
+      try {
+        if (!restSession) localStorage.removeItem(REST_SESSION_KEY);
+        else localStorage.setItem(REST_SESSION_KEY, JSON.stringify({
+          phase: restSession.phase,
+          endsAt: restSession.endsAt || 0,
+          remaining: restSession.remaining || 0,
+          name: restSession.name || "",
+          pendingAlert: !!restSession.pendingAlert
+        }));
+      } catch {}
+    }
+    function restoreRestSession() {
+      try {
+        const raw = JSON.parse(localStorage.getItem(REST_SESSION_KEY) || "null");
+        if (!raw || !raw.phase) return;
+        const endsAt = Number(raw.endsAt) || 0;
+        if (endsAt && Date.now() - endsAt > 10 * 60 * 1000 && raw.phase !== "pause") {
+          localStorage.removeItem(REST_SESSION_KEY);
+          return;
+        }
+        restSession = {
+          phase: raw.phase,
+          endsAt,
+          remaining: Number(raw.remaining) || 0,
+          name: raw.name || "",
+          pendingAlert: !!raw.pendingAlert
+        };
+        if (restSession.phase === "run" && endsAt && Date.now() >= endsAt) {
+          restSession.phase = "done";
+          restSession.pendingAlert = false;
+          persistRestSession();
+          enqueueRestPush({ action: "cancel" });
+          fireRestAlert();
+          return;
+        }
+        if (restSession.phase === "run" || restSession.phase === "pause") armRestTick();
+        if (restSession.phase === "done") fireRestAlert();
+      } catch {}
+    }
+    async function setPushAlerts(on) {
+      if (!on) {
+        restSettings.push = false;
+        saveRestSettings();
+        postRestAlert({ action: "cancel" });
+        try {
+          const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
+          const sub = reg && reg.pushManager && await reg.pushManager.getSubscription();
+          if (sub) {
+            const endpoint = sub.endpoint;
+            await sub.unsubscribe();
+            if (session) await sb.from("push_subscriptions").delete().eq("user_id", session.user.id).eq("endpoint", endpoint);
+          }
+        } catch {}
+        render();
+        return;
+      }
+      if (homeScreenRequired()) {
+        showToast("Add to Home Screen first");
+        render();
+        return;
+      }
+      try {
+        if (typeof Notification === "undefined" || !("PushManager" in window) || !navigator.serviceWorker) {
+          showToast("This browser can't do lock-screen alerts.");
+          return;
+        }
+        const permission = await Notification.requestPermission();
+        if (permission !== "granted") {
+          restSettings.push = false;
+          saveRestSettings();
+          render();
+          return;
+        }
+        const reg = await navigator.serviceWorker.ready;
+        let sub = await reg.pushManager.getSubscription();
+        if (!sub) {
+          sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: vapidKeyBytes(VAPID_PUBLIC_KEY)
+          });
+        }
+        const json = sub.toJSON ? sub.toJSON() : {};
+        const keys = json.keys || {};
+        if (!session || !keys.p256dh || !keys.auth) {
+          render();
+          return;
+        }
+        const res = await sb.from("push_subscriptions").upsert({
+          user_id: session.user.id,
+          endpoint: sub.endpoint,
+          keys: { p256dh: keys.p256dh, auth: keys.auth }
+        }, { onConflict: "user_id,endpoint" });
+        if (res.error) {
+          restSettings.push = false;
+          saveRestSettings();
+          render();
+          return;
+        }
+        restSettings.push = true;
+        saveRestSettings();
+        if (restSession && restSession.phase === "run") {
+          enqueueRestPush({ action: "schedule", fireAt: restSession.endsAt, exerciseName: restSession.name || "" });
+        }
+        render();
+      } catch {
+        restSettings.push = false;
+        saveRestSettings();
+        render();
+      }
+    }
     function maybeStartRest(name) {
       if (!restSettings.auto) return;
       const seconds = restSecondsFor(name);
       restAlerted = false;
-      restSession = { phase: "run", endsAt: Date.now() + seconds * 1000, remaining: seconds * 1000 };
+      restSession = { phase: "run", endsAt: Date.now() + seconds * 1000, remaining: seconds * 1000, name: name || "" };
       armRestTick();
+      persistRestSession();
+      enqueueRestPush({ action: "schedule", fireAt: restSession.endsAt, exerciseName: restSession.name });
     }
     function clearRest() {
       restSession = null;
       restAlerted = false;
       clearInterval(restTick);
+      persistRestSession();
+      enqueueRestPush({ action: "cancel" });
       render();
     }
     function toggleRestPause() {
@@ -3815,10 +4537,13 @@
       if (restSession.phase === "pause") {
         restSession.endsAt = Date.now() + restSession.remaining;
         restSession.phase = "run";
+        enqueueRestPush({ action: "schedule", fireAt: restSession.endsAt, exerciseName: restSession.name || "" });
       } else {
         restSession.remaining = restRemainingMs();
         restSession.phase = "pause";
+        enqueueRestPush({ action: "cancel" });
       }
+      persistRestSession();
       render();
     }
     function adjustRest(deltaSeconds) {
@@ -3827,8 +4552,10 @@
       ms = Math.max(0, Math.min(300000, ms));
       if (restSession.phase === "pause") restSession.remaining = ms;
       else restSession.endsAt = Date.now() + ms;
+      persistRestSession();
       if (ms <= 0) completeRest();
       else {
+        if (restSession.phase === "run") enqueueRestPush({ action: "schedule", fireAt: restSession.endsAt, exerciseName: restSession.name || "" });
         paintRest();
         render();
       }
@@ -3854,7 +4581,9 @@
     function testRestAlert() {
       if (restSettings.sound !== false) ensureAudioCtx();
       restAlerted = false;
-      restSession = { phase: "done" };
+      restSession = { phase: "done", name: "" };
+      persistRestSession();
+      enqueueRestPush({ action: "cancel" });
       fireRestAlert();
       render();
     }
@@ -3918,6 +4647,7 @@
       const r = parseReps(draft.reps);
       if (w == null) { showToast("Enter a valid weight"); return; }
       if (r == null) { showToast("Enter at least 1 rep"); return; }
+      primeScreenLock();
       const row = {
         id: uid(),
         exerciseId: exId,
@@ -3938,6 +4668,8 @@
         showToast(err.message || "Couldn't log that set.");
       } finally {
         saving = false;
+        screenLockHold = false;
+        syncScreenLock();
       }
     }
     function addExtraSet(exId) {
@@ -4161,10 +4893,67 @@
       if (e.key === "Escape" && modal && modal.type !== "migrate-local" && !modal.busy) closeModal();
     });
 
+    function loadThemeChoice() {
+      try {
+        const raw = JSON.parse(localStorage.getItem(THEME_KEY) || "null") || {};
+        const mode = ["dark", "light", "black", "system"].indexOf(raw.mode) >= 0 ? raw.mode : "dark";
+        const accent = ACCENTS.some(item => item[0] === raw.accent) ? raw.accent : "orange";
+        themeChoice = { mode, accent };
+      } catch {
+        themeChoice = { mode: "dark", accent: "orange" };
+      }
+    }
+    function resolvedTheme() {
+      if (themeChoice.mode === "system") {
+        return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+      }
+      return themeChoice.mode;
+    }
+    function applyTheme() {
+      const theme = resolvedTheme();
+      document.documentElement.setAttribute("data-theme", theme);
+      document.documentElement.setAttribute("data-accent", themeChoice.accent);
+      document.documentElement.setAttribute("data-theme-mode", themeChoice.mode);
+      const bg = theme === "light" ? "#f6f3ee" : theme === "black" ? "#000000" : "#0b0b0d";
+      const themeMeta = document.getElementById("theme-color");
+      const schemeMeta = document.getElementById("color-scheme");
+      const bar = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+      if (themeMeta) themeMeta.setAttribute("content", bg);
+      if (schemeMeta) schemeMeta.setAttribute("content", theme === "light" ? "light" : "dark");
+      if (bar) bar.setAttribute("content", theme === "light" ? "default" : "black-translucent");
+    }
+    function saveThemeChoice() {
+      try { localStorage.setItem(THEME_KEY, JSON.stringify(themeChoice)); } catch {}
+      applyTheme();
+    }
+    function setThemeMode(mode) {
+      if (["dark", "light", "black", "system"].indexOf(mode) < 0) return;
+      themeChoice.mode = mode;
+      saveThemeChoice();
+      render();
+    }
+    function setAccent(id) {
+      if (!ACCENTS.some(item => item[0] === id)) return;
+      themeChoice.accent = id;
+      saveThemeChoice();
+      render();
+    }
+    loadThemeChoice();
+    applyTheme();
+    const themeMq = window.matchMedia("(prefers-color-scheme: light)");
+    if (themeMq.addEventListener) themeMq.addEventListener("change", () => {
+      if (themeChoice.mode === "system") applyTheme();
+    });
     loadRestSettings();
-    document.addEventListener("visibilitychange", () => { revealPendingRest(); syncRest(); });
-    window.addEventListener("focus", () => { revealPendingRest(); syncRest(); });
-    window.addEventListener("pageshow", () => { revealPendingRest(); syncRest(); });
+    restoreRestSession();
+    document.addEventListener("pointerdown", () => { if (wakeWanted()) acquireScreenLock(); }, { passive: true });
+    document.addEventListener("visibilitychange", () => {
+      revealPendingRest();
+      syncRest();
+      if (document.visibilityState === "visible") syncScreenLock();
+    });
+    window.addEventListener("focus", () => { revealPendingRest(); syncRest(); syncScreenLock(); });
+    window.addEventListener("pageshow", () => { revealPendingRest(); syncRest(); syncScreenLock(); });
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("sw.js").catch(() => {});
     }
