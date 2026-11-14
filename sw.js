@@ -1,4 +1,4 @@
-const SHELL = "lift-log-shell-v4";
+const SHELL = "lift-log-shell-v5";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -43,7 +43,7 @@ self.addEventListener("push", (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch { data = {}; }
   const title = data.title || "Rest over";
-  const body = data.body || "Time for your next set";
+  const body = data.body || "Rest over - get to work - don't be a pussy";
   const target = new URL(data.url || "./", self.registration.scope).href;
   event.waitUntil(self.registration.showNotification(title, {
     body,
