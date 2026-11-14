@@ -100,6 +100,13 @@ async function claim(id: string) {
 
 async function deliver(row: { id: string; user_id: string; exercise_name: string }) {
   const sb = admin();
+  const { data: alert } = await sb
+    .from("rest_alerts")
+    .select("id")
+    .eq("id", row.id)
+    .is("cancelled_at", null)
+    .maybeSingle();
+  if (!alert) return;
   const { data: subs } = await sb
     .from("push_subscriptions")
     .select("id,endpoint,keys")
@@ -204,18 +211,25 @@ Deno.serve(async (req) => {
     if (!uid) return json({ ok: false }, 401);
     const sb = userClient(req);
     if (action === "cancel") {
+      const now = new Date().toISOString();
+      const recent = new Date(Date.now() - 15000).toISOString();
       await sb.from("rest_alerts")
-        .update({ cancelled_at: new Date().toISOString() })
+        .update({ cancelled_at: now })
         .eq("user_id", uid)
         .is("sent_at", null)
         .is("cancelled_at", null);
+      await sb.from("rest_alerts")
+        .update({ cancelled_at: now })
+        .eq("user_id", uid)
+        .is("cancelled_at", null)
+        .gte("sent_at", recent);
       return json({ ok: true });
     }
     if (action === "schedule") {
       const fireAtMs = Number(body.fireAt);
       const delay = fireAtMs - Date.now();
       if (!Number.isFinite(fireAtMs) || delay < -2000 || delay > MAX_REST_MS + 5000) {
-        return json({ ok: false }, 400);
+        return json({ ok: false, error: "Rest time is out of range" }, 400);
       }
       const name = String(body.exerciseName || "").trim().slice(0, 80);
       await sb.from("rest_alerts")
@@ -228,7 +242,9 @@ Deno.serve(async (req) => {
         exercise_name: name,
         fire_at: new Date(fireAtMs).toISOString(),
       }).select("id").single();
-      if (error || !data) return json({ ok: false }, 200);
+      if (error || !data) {
+        return json({ ok: false, error: (error && error.message) || "Couldn't save the alert", code: error && error.code }, 200);
+      }
       EdgeRuntime.waitUntil(hold(data.id).catch((err) => console.warn(err)));
       return json({ ok: true, id: data.id });
     }
