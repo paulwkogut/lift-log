@@ -233,13 +233,18 @@
       padding: 10px 12px 10px 16px;
       min-height: 64px;
     }
-    .ex-row:active { transform: scale(0.99); background: var(--surface-2); }
-    .ex-row .meta { flex: 1; min-width: 0; }
-    .ex-row .name {
+    .ex-row:active { background: var(--surface-2); }
+    .ex-row .meta { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: stretch; }
+    .ex-row .name, .ex-row .last, .ex-row .chev-btn, .title-link, .wo-ex-name {
+      background: none;
+      text-align: left;
+    }
+    .ex-row .name, .title-link, button.wo-ex-name {
       font-weight: 650;
       font-size: 17px;
       letter-spacing: -0.02em;
       display: block;
+      color: var(--text);
     }
     .ex-row .last {
       color: var(--muted);
@@ -247,6 +252,8 @@
       margin-top: 3px;
       display: block;
     }
+    .ex-row .chev, .ex-row .chev-btn { color: var(--faint); flex-shrink: 0; }
+    .ex-row .chev-btn { min-width: 44px; min-height: 44px; }
     .ex-row .chev { color: var(--faint); flex-shrink: 0; }
     .add-ex-wrap {
       position: sticky;
@@ -1089,7 +1096,12 @@
       margin-bottom: 12px;
       scroll-margin-top: calc(76px + var(--safe-t));
     }
-    .wo-ex-name { font-weight: 750; font-size: 17px; letter-spacing: -0.02em; }
+    .wo-ex-name { font-weight: 750; font-size: 17px; letter-spacing: -0.02em; padding: 0; }
+    .metric-row, .range-row { margin: 0 0 12px; }
+    .metric-row .seg, .range-row .seg { width: 100%; }
+    .metric-row .seg button, .range-row .seg button { flex: 1; min-width: 0; }
+    .trend-line { color: var(--accent-2); font-weight: 750; margin: 0 4px 12px; }
+    .session-sets { color: var(--text); font-weight: 650; }
     .wo-last { color: var(--muted); font-size: 13px; margin-top: 2px; }
     .wo-block.skipped { opacity: 0.62; }
     .wo-block.skipped .wo-ex-name {
@@ -1471,6 +1483,9 @@
     let restPushQueue = Promise.resolve();
     let restPushMissing = false;
     let libQuery = "";
+    let progressQuery = "";
+    let progressMetric = "weight";
+    let progressRange = "all";
     let libEquip = "All";
     let libMuscle = "All";
 
@@ -1541,6 +1556,9 @@
       if (h === "/settings") return { name: "settings" };
       if (h === "/workout") return { name: "workout" };
       if (h === "/library") return { name: "library" };
+      if (h === "/progress") return { name: "progress" };
+      const pg = h.match(/^\/progress\/([^/]+)$/);
+      if (pg) return { name: "progress", id: decodeURIComponent(pg[1]) };
       const tm = h.match(/^\/template\/([^/]+)$/);
       if (tm) return { name: "template", id: decodeURIComponent(tm[1]) };
       const m = h.match(/^\/exercise\/([^/]+)$/);
@@ -2119,6 +2137,7 @@
       if (route.name === "workout") return "workout";
       if (route.name === "template") return "template";
       if (route.name === "library") return "library";
+      if (route.name === "progress") return "progress";
       return "home";
     }
 
@@ -2140,6 +2159,7 @@
       else if (screen === "workout") html = renderWorkout();
       else if (screen === "template") html = renderTemplateEditor();
       else if (screen === "library") html = renderLibrary();
+      else if (screen === "progress") html = renderProgress();
       else html = renderHome();
 
       const showModal = screen !== "auth" && screen !== "loading" && screen !== "recovery" && screen !== "error";
@@ -2275,6 +2295,191 @@
       </div></main>`;
     }
 
+    function rangeCutoff(range) {
+      if (range === "1m" || range === "3m" || range === "6m") {
+        const months = range === "1m" ? 1 : range === "3m" ? 3 : 6;
+        const d = new Date();
+        d.setMonth(d.getMonth() - months);
+        return d.getTime();
+      }
+      return 0;
+    }
+    function isBwSet(lbs) { return fmtWeight(lbs, false) === "0"; }
+    function progressSets(exId) {
+      const cutoff = rangeCutoff(progressRange);
+      return setsFor(exId).filter(s => !cutoff || s.createdAt >= cutoff);
+    }
+    function progressIsBw(sets) {
+      return sets.length > 0 && sets.every(s => isBwSet(s.weightLbs));
+    }
+    function progressDays(sets) {
+      const map = new Map();
+      for (const s of sets) {
+        const k = todayKey(s.createdAt);
+        if (!map.has(k)) map.set(k, []);
+        map.get(k).push(s);
+      }
+      return Array.from(map.entries()).map(([date, daySets]) => ({
+        date,
+        sets: daySets.slice().sort((a, b) => a.createdAt - b.createdAt)
+      })).sort((a, b) => a.date < b.date ? -1 : 1);
+    }
+    function dayMetric(day, metric, bw) {
+      if (bw && metric === "weight") return Math.max.apply(null, day.sets.map(s => s.reps));
+      if (bw && metric === "volume") return day.sets.reduce((sum, s) => sum + s.reps, 0);
+      if (metric === "epley") return Math.max.apply(null, day.sets.map(s => toDisplay(epley(s.weightLbs, s.reps))));
+      if (metric === "volume") return day.sets.reduce((sum, s) => sum + toDisplay(s.weightLbs) * s.reps, 0);
+      return Math.max.apply(null, day.sets.map(s => toDisplay(s.weightLbs)));
+    }
+    function fmtMetric(value, metric, bw) {
+      if (bw && (metric === "weight" || metric === "volume")) {
+        const n = Math.round(value);
+        return n === 1 ? "1 rep" : n + " reps";
+      }
+      if (metric === "volume") return Math.round(value) + (unit() === "kg" ? " kg" : " lb");
+      if (!value) return "—";
+      const rounded = unit() === "kg" ? Math.round(value * 10) / 10 : Math.round(value);
+      if (rounded === 0) return "BW";
+      const s = unit() === "kg" && !Number.isInteger(rounded) ? rounded.toFixed(1) : String(rounded);
+      return s + " " + unit();
+    }
+    function keyTime(key) {
+      const parts = key.split("-").map(Number);
+      return new Date(parts[0], parts[1] - 1, parts[2]).getTime();
+    }
+    function trendText(points, metric, bw) {
+      if (points.length < 2) return "Log another session to see a trend.";
+      const days = Math.max(1, Math.round((keyTime(points[points.length - 1].date) - keyTime(points[0].date)) / 86400000));
+      const delta = points[points.length - 1].value - points[0].value;
+      const repsMode = bw && (metric === "weight" || metric === "volume");
+      const flat = repsMode || metric === "volume" ? 0.5 : 0.25;
+      if (Math.abs(delta) < flat) return "No change in " + days + " days";
+      const sign = delta > 0 ? "+" : "";
+      if (repsMode) return sign + Math.round(delta) + " reps in " + days + " days";
+      const rounded = unit() === "kg" ? Math.round(delta * 10) / 10 : Math.round(delta);
+      return sign + rounded + " " + (unit() === "kg" ? "kg" : "lb") + " in " + days + " days";
+    }
+    function svgValueChart(points) {
+      if (!points.length) return '<div class="chart-empty">Nothing in this range yet.</div>';
+      const w = 360, h = 148, padL = 8, padR = 8, padT = 16, padB = 22;
+      const ys = points.map(p => p.value);
+      let min = Math.min.apply(null, ys), max = Math.max.apply(null, ys);
+      if (min === max) { min = min === 0 ? 0 : min * 0.9; max = (max * 1.1) || 1; }
+      const span = (max - min) || 1;
+      const x = (i) => points.length === 1 ? w / 2 : padL + (i / (points.length - 1)) * (w - padL - padR);
+      const y = (v) => padT + (1 - (v - min) / span) * (h - padT - padB);
+      const coords = points.map((p, i) => [x(i), y(p.value)]);
+      const line = coords.map((c, i) => (i ? "L" : "M") + c[0].toFixed(1) + " " + c[1].toFixed(1)).join(" ");
+      const area = line + " L" + coords[coords.length - 1][0].toFixed(1) + " " + (h - padB) + " L" + coords[0][0].toFixed(1) + " " + (h - padB) + " Z";
+      const dots = coords.map((c, i) => {
+        const last = i === coords.length - 1;
+        return `<circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="${last ? 4.5 : 3.2}" fill="${last ? "var(--accent)" : "var(--accent-2)"}" />`;
+      }).join("");
+      const lastPt = coords[coords.length - 1];
+      const lastLabel = points[points.length - 1].label;
+      const valX = Math.min(w - 8, Math.max(8, lastPt[0] + (points.length === 1 ? 0 : 8)));
+      const valAnchor = points.length === 1 ? "middle" : (lastPt[0] > w - 80 ? "end" : "start");
+      const firstLbl = points[0].date.slice(5);
+      const lastLbl = points[points.length - 1].date.slice(5);
+      const dateLabels = firstLbl === lastLbl
+        ? `<text x="${w / 2}" y="${h - 6}" fill="var(--muted)" font-size="10" text-anchor="middle">${escapeHtml(firstLbl)}</text>`
+        : `<text x="${padL}" y="${h - 6}" fill="var(--muted)" font-size="10">${escapeHtml(firstLbl)}</text><text x="${w - padR}" y="${h - 6}" fill="var(--muted)" font-size="10" text-anchor="end">${escapeHtml(lastLbl)}</text>`;
+      return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="Progress chart"><path d="${area}" fill="var(--accent-dim)"></path><path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path>${dots}<text x="${valX.toFixed(1)}" y="${Math.max(12, lastPt[1] - 8).toFixed(1)}" fill="var(--accent-2)" font-size="11" font-weight="700" text-anchor="${valAnchor}">${escapeHtml(lastLabel)}</text>${dateLabels}</svg>`;
+    }
+    function progressChoices() {
+      const q = progressQuery.trim().toLowerCase();
+      return state.exercises.filter(ex => !q || ex.name.toLowerCase().indexOf(q) !== -1).sort((a, b) => {
+        const aHas = setsFor(a.id).length > 0;
+        const bHas = setsFor(b.id).length > 0;
+        if (aHas !== bHas) return aHas ? -1 : 1;
+        const ta = lastSet(a.id), tb = lastSet(b.id);
+        if (ta && tb && ta.createdAt !== tb.createdAt) return tb.createdAt - ta.createdAt;
+        return a.name.localeCompare(b.name);
+      });
+    }
+    function renderProgress() {
+      const ex = route.id ? exerciseById(route.id) : null;
+      if (!ex) {
+        const rows = progressChoices().map(item => {
+          const n = setsFor(item.id).length;
+          return `<button type="button" class="ex-row" data-go="#/progress/${encodeURIComponent(item.id)}">
+            <span class="meta"><span class="name">${escapeHtml(item.name)}</span><span class="last">${n ? n + " set" + (n === 1 ? "" : "s") : "No sets yet"}</span></span>
+            <span class="chev" aria-hidden="true">${chevron()}</span>
+          </button>`;
+        }).join("");
+        return `<header class="topbar">
+            <button class="icon-btn" data-go="#/" aria-label="Back">${backIcon()}</button>
+            <h1>Progress</h1>
+          </header>
+          <main class="screen">
+            <label class="field-lbl" for="progress-search">Exercise</label>
+            <input class="text-input" id="progress-search" type="search" placeholder="Search" value="${escapeHtml(progressQuery)}" aria-label="Search exercises">
+            <div class="ex-list">${rows || `<div class="empty">${progressQuery ? "No matches." : "No exercises yet."}</div>`}</div>
+          </main>`;
+      }
+      const sets = progressSets(ex.id);
+      const bw = progressIsBw(sets.length ? sets : setsFor(ex.id));
+      const days = progressDays(sets);
+      const metric = progressMetric === "epley" || progressMetric === "volume" ? progressMetric : "weight";
+      const points = days.map(day => {
+        const value = dayMetric(day, metric, bw);
+        return { date: day.date, value, label: fmtMetric(value, metric, bw) };
+      });
+      let heaviest = null, bestEpley = null, bestEpleyVal = -1, mostReps = null, bestVolume = null, bestVolumeVal = -1;
+      sets.forEach(s => {
+        if (!heaviest || s.weightLbs > heaviest.weightLbs) heaviest = s;
+        const est = epley(s.weightLbs, s.reps);
+        if (est > bestEpleyVal) { bestEpleyVal = est; bestEpley = s; }
+        if (!mostReps || s.reps > mostReps.reps || (s.reps === mostReps.reps && s.weightLbs > mostReps.weightLbs)) mostReps = s;
+      });
+      days.forEach(day => {
+        const vol = bw ? day.sets.reduce((sum, s) => sum + s.reps, 0) : day.sets.reduce((sum, s) => sum + toDisplay(s.weightLbs) * s.reps, 0);
+        if (vol > bestVolumeVal) { bestVolumeVal = vol; bestVolume = day; }
+      });
+      const heavyVal = heaviest ? (isBwSet(heaviest.weightLbs) ? "BW" : fmtWeight(heaviest.weightLbs, true)) : "—";
+      const heavySub = heaviest ? formatDay(todayKey(heaviest.createdAt)) + " · " + repLabel(heaviest.reps) : "No sets in this range";
+      const epleyVal = bestEpley && bestEpleyVal > 0 ? fmtWeight(bestEpleyVal, true) : "—";
+      const epleySub = bestEpley && bestEpleyVal > 0
+        ? formatDay(todayKey(bestEpley.createdAt)) + " · " + fmtWeight(bestEpley.weightLbs, true) + " × " + bestEpley.reps
+        : bw ? "Needs a loaded weight" : "No sets in this range";
+      const repsVal = mostReps ? mostReps.reps + (mostReps.reps === 1 ? " rep" : " reps") : "—";
+      const repsSub = mostReps ? "at " + (isBwSet(mostReps.weightLbs) ? "BW" : fmtWeight(mostReps.weightLbs, true)) + " · " + formatDay(todayKey(mostReps.createdAt)) : "No sets in this range";
+      const volVal = bestVolume ? (bw ? bestVolumeVal + " reps" : Math.round(bestVolumeVal) + (unit() === "kg" ? " kg" : " lb")) : "—";
+      const volSub = bestVolume ? formatDay(bestVolume.date) : "No sets in this range";
+      const sessions = days.slice().reverse().map(day => {
+        const bits = day.sets.map(s => (isBwSet(s.weightLbs) ? "BW" : fmtWeight(s.weightLbs, true)) + " × " + s.reps).join(", ");
+        return `<section class="day-group"><div class="day-head"><div class="when">${escapeHtml(formatDay(day.date))}</div></div><div class="session-sets">${escapeHtml(bits)}</div></section>`;
+      }).join("");
+      const chartTitle = bw && metric === "weight" ? "Top reps over time" : metric === "epley" ? "Estimated 1RM over time" : metric === "volume" ? (bw ? "Total reps over time" : "Volume over time") : "Top weight over time";
+      return `<header class="topbar">
+          <button class="icon-btn" data-go="#/progress" aria-label="All exercises">${backIcon()}</button>
+          <h1>${escapeHtml(ex.name)}</h1>
+        </header>
+        <main class="screen">
+          <div class="metric-row"><div class="seg" role="group" aria-label="Chart">
+            <button type="button" data-action="progress-metric" data-metric="weight" class="${metric === "weight" ? "on" : ""}">${bw ? "Reps" : "Weight"}</button>
+            <button type="button" data-action="progress-metric" data-metric="epley" class="${metric === "epley" ? "on" : ""}">1RM</button>
+            <button type="button" data-action="progress-metric" data-metric="volume" class="${metric === "volume" ? "on" : ""}">${bw ? "Total reps" : "Volume"}</button>
+          </div></div>
+          <div class="range-row"><div class="seg" role="group" aria-label="Range">
+            ${[["1m", "1M"], ["3m", "3M"], ["6m", "6M"], ["all", "All"]].map(([id, label]) => `<button type="button" data-action="progress-range" data-range="${id}" class="${progressRange === id ? "on" : ""}">${label}</button>`).join("")}
+          </div></div>
+          <p class="trend-line">${escapeHtml(trendText(points, metric, bw))}</p>
+          <div class="chart-card">
+            <div class="lbl">${chartTitle}</div>
+            <div class="chart-wrap">${svgValueChart(points)}</div>
+          </div>
+          <div class="pr-grid">
+            <div class="pr-card"><div class="lbl">Heaviest</div><div class="val">${escapeHtml(heavyVal)}</div><div class="sub">${escapeHtml(heavySub)}</div></div>
+            <div class="pr-card best"><div class="lbl">Best est. 1RM</div><div class="val">${escapeHtml(epleyVal)}</div><div class="sub">${escapeHtml(epleySub)}</div></div>
+            <div class="pr-card"><div class="lbl">Most reps</div><div class="val">${escapeHtml(repsVal)}</div><div class="sub">${escapeHtml(repsSub)}</div></div>
+            <div class="pr-card"><div class="lbl">${bw ? "Best reps day" : "Best volume"}</div><div class="val">${escapeHtml(volVal)}</div><div class="sub">${escapeHtml(volSub)}</div></div>
+          </div>
+          <div class="eyebrow">Sessions</div>
+          ${sessions || `<div class="empty">No sessions in this range.</div>`}
+        </main>`;
+    }
+
     function renderHome() {
       const used = new Map();
       for (const s of state.sets) used.set(s.exerciseId, s.createdAt);
@@ -2288,13 +2493,13 @@
         const lastTxt = last
           ? `${fmtWeight(last.weightLbs, true)} × ${last.reps} · ${formatDay(todayKey(last.createdAt))}`
           : "No sets yet";
-        return `<button class="ex-row" data-go="#/exercise/${encodeURIComponent(ex.id)}">
-          <span class="meta">
-            <span class="name">${escapeHtml(ex.name)}</span>
-            <span class="last">${escapeHtml(lastTxt)}</span>
-          </span>
-          <span class="chev" aria-hidden="true">${chevron()}</span>
-        </button>`;
+        return `<div class="ex-row">
+          <div class="meta">
+            <button type="button" class="name" data-go="#/progress/${encodeURIComponent(ex.id)}">${escapeHtml(ex.name)}</button>
+            <button type="button" class="last" data-go="#/exercise/${encodeURIComponent(ex.id)}">${escapeHtml(lastTxt)}</button>
+          </div>
+          <button type="button" class="chev-btn" data-go="#/exercise/${encodeURIComponent(ex.id)}" aria-label="Log ${escapeHtml(ex.name)}">${chevron()}</button>
+        </div>`;
       }).join("");
       return `
         <header class="topbar">
@@ -2308,6 +2513,7 @@
         <main class="screen">
           ${renderWorkoutSection()}
           <div class="eyebrow">Exercises</div>
+          <button type="button" class="browse-lib" data-go="#/progress">Progress</button>
           <button type="button" class="browse-lib" data-action="open-library">Browse library</button>
           <div class="ex-list">${rows || `<div class="empty">No exercises yet. Add one to start logging.</div>`}</div>
           <div class="add-ex-wrap">
@@ -2365,7 +2571,7 @@
       return `
         <header class="topbar">
           <button class="icon-btn" data-go="#/" aria-label="Back">${backIcon()}</button>
-          <h1>${escapeHtml(ex.name)}</h1>
+          <h1><button type="button" class="title-link" data-go="#/progress/${encodeURIComponent(ex.id)}">${escapeHtml(ex.name)}</button></h1>
           <button class="icon-btn" data-action="ex-menu" aria-label="Exercise options">${dotsIcon()}</button>
         </header>
         <main class="screen">
@@ -2929,6 +3135,13 @@
       });
       const tplName = document.getElementById("tpl-name");
       if (tplName) tplName.addEventListener("change", () => saveTemplateName());
+      const progressSearch = document.getElementById("progress-search");
+      if (progressSearch) {
+        progressSearch.addEventListener("input", () => {
+          progressQuery = progressSearch.value;
+          render();
+        });
+      }
       const libSearch = document.getElementById("lib-search");
       if (libSearch) {
         libSearch.addEventListener("input", () => {
@@ -3136,6 +3349,16 @@
         return render();
       }
       if (action === "tpl-add-library") return pickLibraryExercise(el.getAttribute("data-name"));
+      if (action === "progress-metric") {
+        progressMetric = el.getAttribute("data-metric") || "weight";
+        render();
+        return;
+      }
+      if (action === "progress-range") {
+        progressRange = el.getAttribute("data-range") || "all";
+        render();
+        return;
+      }
       if (action === "open-library") {
         libQuery = "";
         libEquip = "All";
@@ -4765,7 +4988,7 @@
         return `<section class="wo-block skipped" id="wo-${escapeHtml(id)}">
           <div class="wo-block-head">
             <div>
-              <div class="wo-ex-name">${escapeHtml(name)}</div>
+              <button type="button" class="wo-ex-name" data-go="#/progress/${encodeURIComponent(id)}">${escapeHtml(name)}</button>
               <div class="skip-label">Skipped</div>
             </div>
             <button type="button" class="skip-btn" data-action="wo-unskip" data-id="${escapeHtml(id)}">Unskip</button>
@@ -4798,7 +5021,7 @@
       return `<section class="wo-block" id="wo-${escapeHtml(id)}">
         <div class="wo-block-head">
           <div>
-            <div class="wo-ex-name">${escapeHtml(name)}</div>
+            <button type="button" class="wo-ex-name" data-go="#/progress/${encodeURIComponent(id)}">${escapeHtml(name)}</button>
             <div class="wo-last">${doneCount}/${planned} sets</div>
           </div>
           <button type="button" class="skip-btn" data-action="wo-skip" data-id="${escapeHtml(id)}" aria-label="Skip ${escapeHtml(name)}">Skip</button>
