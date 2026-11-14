@@ -1493,6 +1493,9 @@
     let progressMetric = "weight";
     let progressRange = "all";
     let historyShown = 12;
+    let adminStats;
+    let adminStatsBusy = false;
+    let adminStatsToken = 0;
     let libEquip = "All";
     let libMuscle = "All";
 
@@ -1561,6 +1564,7 @@
       if (isAuthHash(raw)) return { name: "home" };
       const h = raw.replace(/^#/, "") || "/";
       if (h === "/settings") return { name: "settings" };
+      if (h === "/admin") return { name: "admin" };
       if (h === "/workout") return { name: "workout" };
       if (h === "/history") return { name: "history" };
       const hist = h.match(/^\/history\/(\d{4}-\d{2}-\d{2})$/);
@@ -2050,6 +2054,9 @@
         session = null;
         recoveryMode = false;
         dataReadyFor = null;
+        adminStats = undefined;
+        adminStatsBusy = false;
+        adminStatsToken++;
         state = blankState();
         activeWorkout = null;
         workoutDrafts = {};
@@ -2144,6 +2151,7 @@
       if (!session) return "auth";
       if (bootError) return "error";
       if (route.name === "settings") return "settings";
+      if (route.name === "admin") return "admin";
       if (route.name === "exercise") return "exercise";
       if (route.name === "workout") return "workout";
       if (route.name === "history") return "history";
@@ -2160,6 +2168,7 @@
       const activePos = active && typeof active.selectionStart === "number" ? [active.selectionStart, active.selectionEnd] : null;
       const screen = screenName();
       appEl.dataset.screen = screen;
+      if (screen === "settings" || screen === "admin") ensureAdminStats();
 
       let html = "";
       if (screen === "recovery") html = renderRecovery();
@@ -2167,6 +2176,7 @@
       else if (screen === "auth") html = renderAuth();
       else if (screen === "error") html = renderBootError();
       else if (screen === "settings") html = renderSettings();
+      else if (screen === "admin") html = renderAdmin();
       else if (screen === "exercise") html = renderExercise();
       else if (screen === "workout") html = renderWorkout();
       else if (screen === "history") html = renderHistory();
@@ -2783,6 +2793,86 @@
       return `<div class="eyebrow">Add to Home Screen</div>
         <p class="hint">In Safari, tap Share, then Add to Home Screen. Lift Log opens full screen, clear of the notch and home bar.</p>`;
     }
+    function statNum(v) {
+      const n = Number(v);
+      return Number.isFinite(n) ? Math.round(n).toLocaleString("en-US") : "0";
+    }
+    function ensureAdminStats() {
+      if (adminStats !== undefined || adminStatsBusy || !session) return;
+      adminStatsBusy = true;
+      const token = ++adminStatsToken;
+      sb.rpc("admin_stats").then(res => {
+        if (token !== adminStatsToken) return;
+        adminStatsBusy = false;
+        let data = res && res.data;
+        if (!res || res.error || data == null) adminStats = null;
+        else {
+          if (typeof data === "string") {
+            try { data = JSON.parse(data); } catch { data = null; }
+          }
+          adminStats = data && typeof data === "object" ? data : null;
+        }
+        if (route.name === "settings" || route.name === "admin") render();
+      }).catch(() => {
+        if (token !== adminStatsToken) return;
+        adminStatsBusy = false;
+        adminStats = null;
+      });
+    }
+    function adminBars(days) {
+      const list = Array.isArray(days) ? days.slice(0, 14) : [];
+      if (!list.length) return `<div class="chart-empty">No days yet</div>`;
+      const w = 360, h = 128, padB = 20, padT = 10, gap = 4;
+      const max = Math.max(1, ...list.map(d => Number(d.n) || 0));
+      const bw = (w - gap * (list.length - 1)) / list.length;
+      const bars = list.map((d, i) => {
+        const n = Number(d.n) || 0;
+        const bh = n ? Math.max(4, (n / max) * (h - padT - padB)) : 2;
+        const x = i * (bw + gap);
+        const y = h - padB - bh;
+        return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(2, bw).toFixed(1)}" height="${bh.toFixed(1)}" rx="3" fill="${n ? "var(--accent)" : "var(--line)"}"></rect>`;
+      }).join("");
+      const label = (d) => escapeHtml(String(d && d.d || "").slice(5));
+      return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Active lifters for the last 14 days">
+        ${bars}
+        <text x="0" y="${h - 4}" fill="var(--muted)" font-size="10">${label(list[0])}</text>
+        <text x="${w}" y="${h - 4}" fill="var(--muted)" font-size="10" text-anchor="end">${label(list[list.length - 1])}</text>
+      </svg>`;
+    }
+    function renderAdmin() {
+      if (!adminStats) {
+        return `<header class="topbar">
+          <button class="icon-btn" data-go="#/settings" aria-label="Back">${backIcon()}</button>
+          <h1>Admin stats</h1>
+        </header>
+        <main class="screen"><div class="empty">${adminStats === undefined ? "Loading…" : "Nothing here."}</div></main>`;
+      }
+      const s = adminStats;
+      const cards = [
+        ["Users", s.users, "All accounts"],
+        ["New", s.new7, "Last 7 days"],
+        ["Signed in", s.seen7, "Last 7 days"],
+        ["Lifters today", s.lifters1, "Logged a set"],
+        ["Lifters", s.lifters7, "Last 7 days"],
+        ["Lifters", s.lifters30, "Last 30 days"],
+        ["Sets today", s.sets1, "Logged today"],
+        ["Sets", s.sets7, "Last 7 days"],
+        ["Sets", s.sets, "All time"]
+      ];
+      const grid = cards.map(([lbl, val, sub]) => `<div class="pr-card"><div class="lbl">${escapeHtml(lbl)}</div><div class="val">${escapeHtml(statNum(val))}</div><div class="sub">${escapeHtml(sub)}</div></div>`).join("");
+      return `<header class="topbar">
+          <button class="icon-btn" data-go="#/settings" aria-label="Back">${backIcon()}</button>
+          <h1>Admin stats</h1>
+        </header>
+        <main class="screen">
+          <div class="pr-grid">${grid}</div>
+          <div class="chart-card">
+            <div class="lbl">Active lifters</div>
+            <div class="chart-wrap">${adminBars(s.days)}</div>
+          </div>
+          <p class="hint">Days follow the database clock. A lifter is someone who logged a set.</p>
+        </main>`;
+    }
     function renderSettings() {
       const u = unit();
       const count = state.sets.length;
@@ -2808,6 +2898,16 @@
               </div>
             </button>
           </div>
+          ${adminStats ? `<div class="eyebrow">Admin</div>
+          <div class="settings-card">
+            <button type="button" class="settings-row tappable" data-go="#/admin">
+              <div>
+                <div class="k">Admin stats</div>
+                <div class="d">${escapeHtml(statNum(adminStats.users))} users</div>
+              </div>
+              <span class="chev">${chevron()}</span>
+            </button>
+          </div>` : ""}
           <div class="eyebrow">Units</div>
           <div class="settings-card">
             <div class="settings-row">
