@@ -1626,6 +1626,40 @@
       }
       draftExId = exId;
     }
+    const SHARE_LINK = "https://paulwkogut.github.io/lift-log/";
+    async function shareLiftLog() {
+      const payload = {
+        title: "Lift Log",
+        text: "Track your lifts with Lift Log. Sign up free:",
+        url: SHARE_LINK
+      };
+      if (typeof navigator.share === "function") {
+        try {
+          await navigator.share(payload);
+          return;
+        } catch (err) {
+          if (err && err.name === "AbortError") return;
+        }
+      }
+      try {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+          await navigator.clipboard.writeText(SHARE_LINK);
+        } else {
+          const input = document.createElement("textarea");
+          input.value = SHARE_LINK;
+          input.setAttribute("readonly", "");
+          input.style.position = "fixed";
+          input.style.left = "-9999px";
+          document.body.appendChild(input);
+          input.select();
+          document.execCommand("copy");
+          input.remove();
+        }
+        showToast("Link copied");
+      } catch {
+        showToast("Couldn't copy the link");
+      }
+    }
     function showToast(msg) {
       toastMsg = msg;
       clearTimeout(toastTimer);
@@ -2219,6 +2253,7 @@
             <div class="brand-mark" aria-hidden="true">${barbellIcon()}</div>
             <h1>Lift Log</h1>
           </div>
+          <button class="icon-btn" data-action="share-app" aria-label="Share Lift Log">${shareIcon()}</button>
           <button class="icon-btn" data-go="#/settings" aria-label="Settings">${gearIcon()}</button>
         </header>
         <main class="screen">
@@ -2492,6 +2527,12 @@
           <p class="hint">Your sets are saved to this account. Export a backup anytime.</p>
           <div class="eyebrow">Help</div>
           <div class="settings-card">
+            <button class="settings-row tappable" data-action="share-app">
+              <div>
+                <div class="k">Share Lift Log</div>
+                <div class="d">Invite a friend with the link</div>
+              </div>
+            </button>
             <button class="settings-row tappable" data-action="show-tutorial">
               <div>
                 <div class="k">How to use Lift Log</div>
@@ -2727,6 +2768,13 @@
         <rect x="7.6" y="11" width="8.8" height="2" rx="0.6" fill="currentColor"/>
       </svg>`;
     }
+    function shareIcon() {
+      return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 3v12"></path>
+        <path d="M8 7l4-4 4 4"></path>
+        <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"></path>
+      </svg>`;
+    }
     function gearIcon() {
       return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"></circle>
@@ -2949,6 +2997,7 @@
         render();
         return;
       }
+      if (action === "share-app") return shareLiftLog();
       if (action === "show-tutorial") {
         tutorialOpen = true;
         tutorialStep = 0;
