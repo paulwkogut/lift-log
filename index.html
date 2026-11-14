@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0b0d">
+  <meta name="color-scheme" content="dark">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Lift Log">
+  <meta name="application-name" content="Lift Log">
+  <meta name="description" content="Log your lifts by exercise. Fast, offline, just for you.">
+  <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Lift%20Log%22%2C%22short_name%22%3A%22Lift%20Log%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230b0b0d%22%2C%22theme_color%22%3A%22%230b0b0d%22%7D">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0b0d'/%3E%3Crect x='4' y='14' width='24' height='4' rx='1' fill='%23ff6a2a'/%3E%3Crect x='3' y='10' width='5' height='12' rx='1.5' fill='%23ffd7a8'/%3E%3Crect x='24' y='10' width='5' height='12' rx='1.5' fill='%23ffd7a8'/%3E%3C/svg%3E">
+  <title>Lift Log</title>
+  <style>
+    :root {
+      --bg: #0b0b0d;
+      --bg-elev: #121216;
+      --surface: #18181e;
+      --surface-2: #202028;
+      --line: #2a2a34;
+      --text: #f4f1ec;
+      --muted: #8d8a86;
+      --faint: #5c5a58;
+      --accent: #ff6a2a;
+      --accent-2: #ffd7a8;
+      --accent-dim: rgba(255, 106, 42, 0.16);
+      --good: #3ee08f;
+      --good-dim: rgba(62, 224, 143, 0.12);
+      --danger: #ff5a5a;
+      --danger-dim: rgba(255, 90, 90, 0.12);
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      --safe-t: env(safe-area-inset-top, 0px);
+      --safe-b: env(safe-area-inset-bottom, 0px);
+      --radius: 18px;
+      --tap: 52px;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); }
+    html { height: 100%; }
+    body {
+      min-height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.4;
+      overscroll-behavior: none;
+    }
+    button, input { font: inherit; color: inherit; }
+    button { appearance: none; background: none; border: 0; padding: 0; cursor: pointer; }
+    input { background: none; border: 0; outline: none; }
+    input[type="number"] { -moz-appearance: textfield; }
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+    #app {
+      max-width: 480px;
+      margin: 0 auto;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: calc(24px + var(--safe-b));
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: calc(10px + var(--safe-t)) 14px 10px;
+      background: color-mix(in srgb, var(--bg) 86%, transparent);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid transparent;
+    }
+    .topbar.scrolled { border-bottom-color: var(--line); }
+    .topbar h1 {
+      flex: 1;
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: -0.03em;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      min-width: 0;
+    }
+    .brand-mark {
+      width: 30px;
+      height: 30px;
+      flex-shrink: 0;
+      border-radius: 8px;
+      background: var(--accent);
+      display: grid;
+      place-items: center;
+    }
+    .brand-mark svg { display: block; }
+    .brand h1 { font-size: 22px; }
+
+    .icon-btn {
+      width: var(--tap);
+      height: var(--tap);
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      color: var(--text);
+      flex-shrink: 0;
+    }
+    .icon-btn:active { background: var(--surface-2); transform: scale(0.96); }
+    .icon-btn.ghost { color: var(--muted); }
+
+    .screen { padding: 8px 16px 0; flex: 1; }
+
+    .eyebrow {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin: 8px 2px 10px;
+    }
+
+    .ex-list { display: flex; flex-direction: column; gap: 6px; padding-bottom: 4px; }
+    .ex-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      text-align: left;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 10px 12px 10px 16px;
+      min-height: 64px;
+    }
+    .ex-row:active { transform: scale(0.99); background: var(--surface-2); }
+    .ex-row .meta { flex: 1; min-width: 0; }
+    .ex-row .name {
+      font-weight: 650;
+      font-size: 17px;
+      letter-spacing: -0.02em;
+      display: block;
+    }
+    .ex-row .last {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 3px;
+      display: block;
+    }
+    .ex-row .chev { color: var(--faint); flex-shrink: 0; }
+    .add-ex-wrap {
+      position: sticky;
+      bottom: 0;
+      margin: 8px -16px 0;
+      padding: 14px 16px calc(8px + var(--safe-b));
+      background: linear-gradient(180deg, transparent, var(--bg) 36%);
+    }
+    .add-ex {
+      width: 100%;
+      min-height: var(--tap);
+      border-radius: var(--radius);
+      border: 1.5px dashed #3a3a44;
+      background: var(--bg-elev);
+      color: var(--accent-2);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .add-ex:active { background: var(--surface); }
+
+    .pr-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .pr-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px 14px 12px;
+    }
+    .pr-card .lbl {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 650;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+    .pr-card .val {
+      font-size: 26px;
+      font-weight: 750;
+      letter-spacing: -0.04em;
+      margin-top: 4px;
+      font-variant-numeric: tabular-nums;
+    }
+    .pr-card .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .pr-card.best .val { color: var(--good); }
+
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 12px 12px 8px;
+      margin-bottom: 16px;
+    }
+    .chart-card .lbl {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 650;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      padding: 2px 4px 8px;
+    }
+    .chart-wrap { height: 128px; }
+    .chart-wrap svg { width: 100%; height: 100%; display: block; }
+    .chart-empty {
+      height: 128px;
+      display: grid;
+      place-items: center;
+      color: var(--faint);
+      font-size: 13px;
+    }
+
+    .logger {
+      background: linear-gradient(180deg, #1a1a22 0%, var(--surface) 100%);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 16px 14px 14px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow);
+    }
+    .logger-grid {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 12px;
+    }
+    .stepper { text-align: center; }
+    .stepper .unit-lbl {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .stepper input {
+      width: 100%;
+      min-width: 0;
+      text-align: center;
+      font-size: 40px;
+      font-weight: 750;
+      letter-spacing: -0.05em;
+      font-variant-numeric: tabular-nums;
+      padding: 2px 0 4px;
+      height: 52px;
+    }
+    .step-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 2px;
+    }
+    .step-btn {
+      flex: 1;
+      height: 52px;
+      border-radius: 14px;
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      font-size: 26px;
+      font-weight: 500;
+      line-height: 1;
+      color: var(--accent-2);
+    }
+    .step-btn:active { background: var(--accent-dim); transform: scale(0.95); }
+    .add-set {
+      margin-top: 14px;
+      width: 100%;
+      height: 58px;
+      border-radius: 16px;
+      background: var(--accent);
+      color: #1a0a00;
+      font-weight: 800;
+      font-size: 17px;
+      letter-spacing: 0.02em;
+    }
+    .add-set:active { filter: brightness(0.92); transform: scale(0.99); }
+    .add-set:disabled { opacity: 0.45; }
+
+    .day-group { margin-bottom: 16px; }
+    .day-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      padding: 0 4px 8px;
+    }
+    .day-head .when { font-weight: 700; font-size: 14px; }
+    .day-head .vol { color: var(--muted); font-size: 12px; }
+    .set-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 8px 8px 8px 14px;
+      margin-bottom: 6px;
+      min-height: 52px;
+    }
+    .set-idx {
+      color: var(--faint);
+      font-size: 12px;
+      font-weight: 700;
+      width: 18px;
+    }
+    .set-main { flex: 1; font-weight: 650; font-variant-numeric: tabular-nums; }
+    .set-main span { color: var(--muted); font-weight: 500; }
+    .row-actions { display: flex; gap: 4px; }
+    .mini {
+      min-width: 44px;
+      height: 44px;
+      padding: 0 10px;
+      border-radius: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+    .mini:active { background: var(--surface-2); }
+    .mini.danger { color: var(--danger); }
+
+    .empty {
+      text-align: center;
+      color: var(--muted);
+      padding: 22px 12px;
+      font-size: 14px;
+    }
+
+    .settings-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    .settings-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px;
+      width: 100%;
+      text-align: left;
+      min-height: 64px;
+      border-bottom: 1px solid var(--line);
+    }
+    .settings-row:last-child { border-bottom: 0; }
+    .settings-row .k { font-weight: 650; }
+    .settings-row .d { color: var(--muted); font-size: 13px; margin-top: 3px; }
+    .settings-row:active.tappable { background: var(--surface-2); }
+
+    .seg {
+      display: flex;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 3px;
+    }
+    .seg button {
+      min-width: 64px;
+      height: 36px;
+      border-radius: 9px;
+      font-weight: 700;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .seg button.on {
+      background: var(--accent);
+      color: #1a0a00;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      padding: 4px 8px 16px;
+      line-height: 1.5;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.62);
+      z-index: 50;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .sheet {
+      width: 100%;
+      max-width: 480px;
+      background: var(--bg-elev);
+      border-radius: 22px 22px 0 0;
+      padding: 10px 16px calc(20px + var(--safe-b));
+      border-top: 1px solid var(--line);
+      animation: up 0.22s ease;
+    }
+    @keyframes up {
+      from { transform: translateY(16px); opacity: 0.6; }
+      to { transform: none; opacity: 1; }
+    }
+    .grab {
+      width: 40px;
+      height: 4px;
+      border-radius: 99px;
+      background: #3a3a44;
+      margin: 4px auto 14px;
+    }
+    .sheet h2 { margin: 0 0 14px; font-size: 18px; letter-spacing: -0.02em; }
+    .field-lbl {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .text-input, .num-input {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px 14px;
+      font-size: 17px;
+      margin-bottom: 14px;
+    }
+    .num-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .sheet-actions { display: flex; gap: 8px; margin-top: 4px; }
+    .btn {
+      flex: 1;
+      height: 52px;
+      border-radius: 14px;
+      font-weight: 750;
+    }
+    .btn.primary { background: var(--accent); color: #1a0a00; }
+    .btn.primary:active { filter: brightness(0.92); }
+    .btn.ghost { background: var(--surface-2); color: var(--text); }
+    .btn.danger { background: var(--danger-dim); color: var(--danger); }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: calc(28px + var(--safe-b));
+      transform: translateX(-50%);
+      background: #f4f1ec;
+      color: #16140f;
+      font-weight: 700;
+      font-size: 14px;
+      padding: 12px 16px;
+      border-radius: 14px;
+      z-index: 80;
+      box-shadow: var(--shadow);
+      animation: pop 0.2s ease;
+      max-width: calc(100% - 32px);
+    }
+    @keyframes pop {
+      from { transform: translateX(-50%) translateY(8px); opacity: 0; }
+      to { transform: translateX(-50%); opacity: 1; }
+    }
+
+    .more-menu {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .more-menu button {
+      text-align: left;
+      padding: 14px 12px;
+      border-radius: 14px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      font-weight: 650;
+      min-height: 52px;
+    }
+    .more-menu button:active { background: var(--surface-2); }
+    .more-menu button.warn { color: var(--danger); }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+  (function () {
+    const STORAGE_KEY = "lift-log-v1";
+    const LB_PER_KG = 2.2046226218;
+    const DEFAULT_NAMES = [
+      "Bench Press", "Squat", "Deadlift", "Overhead Press",
+      "Barbell Row", "Pull-up", "Lat Pulldown", "Dumbbell Curl", "Leg Press"
+    ];
+
+    const $ = (sel, el = document) => el.querySelector(sel);
+    const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+    function defaultExercises() {
+      return DEFAULT_NAMES.map((name, i) => ({
+        id: "ex-" + (i + 1),
+        name,
+        custom: false,
+        createdAt: Date.now()
+      }));
+    }
+
+    function emptyState() {
+      return {
+        version: 1,
+        settings: { unit: "lbs" },
+        exercises: defaultExercises(),
+        sets: []
+      };
+    }
+
+    function load() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return emptyState();
+        const data = JSON.parse(raw);
+        if (!data || !Array.isArray(data.exercises) || !Array.isArray(data.sets)) return emptyState();
+        data.settings = data.settings || { unit: "lbs" };
+        if (data.settings.unit !== "kg") data.settings.unit = "lbs";
+        return data;
+      } catch {
+        return emptyState();
+      }
+    }
+
+    function save() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    let state = load();
+    let route = parseHash();
+    let modal = null;
+    let toastTimer = 0;
+    let toastMsg = "";
+    let draft = { weight: "", reps: "" };
+    let draftExId = null;
+
+    function parseHash() {
+      const h = (location.hash || "#/").replace(/^#/, "") || "/";
+      if (h === "/settings") return { name: "settings" };
+      const m = h.match(/^\/exercise\/([^/]+)$/);
+      if (m) return { name: "exercise", id: decodeURIComponent(m[1]) };
+      return { name: "home" };
+    }
+
+    function go(hash) {
+      location.hash = hash;
+    }
+
+    function unit() { return state.settings.unit; }
+    function toDisplay(lbs) {
+      if (unit() === "kg") return lbs / LB_PER_KG;
+      return lbs;
+    }
+    function toLbs(val) {
+      if (unit() === "kg") return val * LB_PER_KG;
+      return val;
+    }
+    function fmtWeight(lbs, withUnit) {
+      const n = toDisplay(lbs);
+      const rounded = unit() === "kg" ? Math.round(n * 10) / 10 : Math.round(n * 2) / 2;
+      const s = unit() === "kg"
+        ? (Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1))
+        : (Number.isInteger(rounded) ? String(rounded) : String(rounded));
+      return withUnit ? s + " " + unit() : s;
+    }
+    function weightStep() { return unit() === "kg" ? 2.5 : 5; }
+    function epley(lbs, reps) {
+      if (!reps || reps < 1 || !lbs) return 0;
+      if (reps === 1) return lbs;
+      return lbs * (1 + reps / 30);
+    }
+    function todayKey(ts) {
+      const d = new Date(ts);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return y + "-" + m + "-" + day;
+    }
+    function formatDay(key) {
+      const [y, m, d] = key.split("-").map(Number);
+      const date = new Date(y, m - 1, d);
+      const today = todayKey(Date.now());
+      const yest = todayKey(Date.now() - 86400000);
+      if (key === today) return "Today";
+      if (key === yest) return "Yesterday";
+      return date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+    }
+    function repLabel(n) { return n === 1 ? "1 rep" : n + " reps"; }
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[c]));
+    }
+
+    function setsFor(exId) {
+      return state.sets.filter(s => s.exerciseId === exId).sort((a, b) => a.createdAt - b.createdAt);
+    }
+    function lastSet(exId) {
+      const list = setsFor(exId);
+      return list.length ? list[list.length - 1] : null;
+    }
+    function prsFor(exId) {
+      const list = setsFor(exId);
+      if (!list.length) return { heaviest: null, epley: null };
+      let heaviest = list[0];
+      let best = list[0];
+      let bestVal = epley(list[0].weightLbs, list[0].reps);
+      for (const s of list) {
+        if (s.weightLbs > heaviest.weightLbs) heaviest = s;
+        const v = epley(s.weightLbs, s.reps);
+        if (v > bestVal) { bestVal = v; best = s; }
+      }
+      return { heaviest, epley: { set: best, value: bestVal } };
+    }
+    function topWeightByDay(exId) {
+      const map = new Map();
+      for (const s of setsFor(exId)) {
+        const k = todayKey(s.createdAt);
+        const prev = map.get(k);
+        if (!prev || s.weightLbs > prev) map.set(k, s.weightLbs);
+      }
+      return Array.from(map.entries()).map(([date, weightLbs]) => ({ date, weightLbs }));
+    }
+    function ensureDraft(exId) {
+      if (draftExId === exId && draft.weight !== "" && draft.reps !== "") return;
+      const last = lastSet(exId);
+      if (last) {
+        draft = { weight: fmtWeight(last.weightLbs, false), reps: String(last.reps) };
+      } else {
+        draft = { weight: unit() === "kg" ? "20" : "45", reps: "5" };
+      }
+      draftExId = exId;
+    }
+
+    function showToast(msg) {
+      toastMsg = msg;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { toastMsg = ""; render(); }, 1800);
+      render();
+    }
+
+    function exerciseById(id) {
+      return state.exercises.find(e => e.id === id);
+    }
+
+    function svgChart(points) {
+      if (!points.length) return '<div class="chart-empty">Log a few sessions to see your trend</div>';
+      const w = 360, h = 128, padL = 8, padR = 8, padT = 12, padB = 22;
+      const ys = points.map(p => toDisplay(p.weightLbs));
+      let min = Math.min(...ys), max = Math.max(...ys);
+      if (min === max) { min = min * 0.9; max = max * 1.1 || 1; }
+      const span = max - min || 1;
+      const x = (i) => {
+        if (points.length === 1) return w / 2;
+        return padL + (i / (points.length - 1)) * (w - padL - padR);
+      };
+      const y = (v) => padT + (1 - (v - min) / span) * (h - padT - padB);
+      const coords = points.map((p, i) => [x(i), y(toDisplay(p.weightLbs))]);
+      const line = coords.map((c, i) => (i ? "L" : "M") + c[0].toFixed(1) + " " + c[1].toFixed(1)).join(" ");
+      const area = line + " L" + coords[coords.length - 1][0].toFixed(1) + " " + (h - padB) +
+        " L" + coords[0][0].toFixed(1) + " " + (h - padB) + " Z";
+      const dots = coords.map((c, i) => {
+        const last = i === coords.length - 1;
+        return `<circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="${last ? 4.5 : 3.2}" fill="${last ? "#ff6a2a" : "#ffd7a8"}" />`;
+      }).join("");
+      const lastPt = coords[coords.length - 1];
+      const lastVal = fmtWeight(points[points.length - 1].weightLbs, false);
+      const valX = Math.min(w - 16, Math.max(16, lastPt[0] + (points.length === 1 ? 0 : 8)));
+      const valAnchor = points.length === 1 ? "middle" : (lastPt[0] > w - 50 ? "end" : "start");
+      const firstLbl = points[0].date.slice(5);
+      const lastLbl = points[points.length - 1].date.slice(5);
+      const dateLabels = firstLbl === lastLbl
+        ? `<text x="${w / 2}" y="${h - 6}" fill="#8d8a86" font-size="10" text-anchor="middle">${escapeHtml(firstLbl)}</text>`
+        : `<text x="${padL}" y="${h - 6}" fill="#8d8a86" font-size="10">${escapeHtml(firstLbl)}</text>
+        <text x="${w - padR}" y="${h - 6}" fill="#8d8a86" font-size="10" text-anchor="end">${escapeHtml(lastLbl)}</text>`;
+      return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="Top set weight over time">
+        <path d="${area}" fill="rgba(255,106,42,0.14)"></path>
+        <path d="${line}" fill="none" stroke="#ff6a2a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path>
+        ${dots}
+        <text x="${valX.toFixed(1)}" y="${Math.max(12, lastPt[1] - 10).toFixed(1)}" fill="#ffd7a8" font-size="11" font-weight="700" text-anchor="${valAnchor}">${escapeHtml(lastVal)}</text>
+        ${dateLabels}
+      </svg>`;
+    }
+
+    function render() {
+      const app = document.getElementById("app");
+      const scrollY = window.scrollY;
+      const active = document.activeElement;
+      const activeId = active && active.id;
+      const activePos = active && typeof active.selectionStart === "number" ? [active.selectionStart, active.selectionEnd] : null;
+
+      let html = "";
+      if (route.name === "settings") html = renderSettings();
+      else if (route.name === "exercise") html = renderExercise();
+      else html = renderHome();
+      if (modal) html += renderModal();
+      if (toastMsg) html += `<div class="toast" role="status">${escapeHtml(toastMsg)}</div>`;
+      app.innerHTML = html;
+      bind();
+
+      if (activeId) {
+        const el = document.getElementById(activeId);
+        if (el) {
+          el.focus();
+          if (activePos && el.setSelectionRange) {
+            try { el.setSelectionRange(activePos[0], activePos[1]); } catch {}
+          }
+        }
+      } else {
+        window.scrollTo(0, scrollY);
+      }
+    }
+
+    function renderHome() {
+      const used = new Map();
+      for (const s of state.sets) used.set(s.exerciseId, s.createdAt);
+      const exercises = state.exercises.slice().sort((a, b) => {
+        const ta = used.get(a.id) || 0, tb = used.get(b.id) || 0;
+        if (ta !== tb) return tb - ta;
+        return a.name.localeCompare(b.name);
+      });
+      const rows = exercises.map(ex => {
+        const last = lastSet(ex.id);
+        const lastTxt = last
+          ? `${fmtWeight(last.weightLbs, true)} × ${last.reps} · ${formatDay(todayKey(last.createdAt))}`
+          : "No sets yet";
+        return `<button class="ex-row" data-go="#/exercise/${encodeURIComponent(ex.id)}">
+          <span class="meta">
+            <span class="name">${escapeHtml(ex.name)}</span>
+            <span class="last">${escapeHtml(lastTxt)}</span>
+          </span>
+          <span class="chev" aria-hidden="true">${chevron()}</span>
+        </button>`;
+      }).join("");
+      return `
+        <header class="topbar">
+          <div class="brand">
+            <div class="brand-mark" aria-hidden="true">${barbellIcon()}</div>
+            <h1>Lift Log</h1>
+          </div>
+          <button class="icon-btn" data-go="#/settings" aria-label="Settings">${gearIcon()}</button>
+        </header>
+        <main class="screen">
+          <div class="eyebrow">Exercises</div>
+          <div class="ex-list">${rows || `<div class="empty">No exercises yet. Add one to start logging.</div>`}</div>
+          <div class="add-ex-wrap">
+            <button class="add-ex" data-action="add-exercise">+ Add exercise</button>
+          </div>
+        </main>`;
+    }
+
+    function renderExercise() {
+      const ex = exerciseById(route.id);
+      if (!ex) {
+        return `<header class="topbar">
+          <button class="icon-btn" data-go="#/" aria-label="Back">${backIcon()}</button>
+          <h1>Not found</h1>
+        </header>
+        <main class="screen"><div class="empty">That exercise is gone.</div>
+        <button class="add-ex" data-go="#/">Back to list</button></main>`;
+      }
+      ensureDraft(ex.id);
+      const pr = prsFor(ex.id);
+      const points = topWeightByDay(ex.id);
+      const heavy = pr.heaviest ? fmtWeight(pr.heaviest.weightLbs, true) : "—";
+      const e1 = pr.epley ? fmtWeight(pr.epley.value, true) : "—";
+      const eSub = pr.epley
+        ? `From ${fmtWeight(pr.epley.set.weightLbs, true)} × ${pr.epley.set.reps}`
+        : "Epley formula";
+      const hSub = pr.heaviest ? repLabel(pr.heaviest.reps) : "No sets yet";
+
+      const groups = groupSets(ex.id);
+      let history = "";
+      if (!groups.length) {
+        history = `<div class="empty">No history yet. Log your first set above.</div>`;
+      } else {
+        history = groups.map(g => {
+          const vol = g.sets.reduce((sum, s) => sum + toDisplay(s.weightLbs) * s.reps, 0);
+          const volTxt = unit() === "kg"
+            ? Math.round(vol) + " kg volume"
+            : Math.round(vol) + " lb volume";
+          const rows = g.sets.map((s, i) => `
+            <div class="set-row">
+              <div class="set-idx">${i + 1}</div>
+              <div class="set-main">${escapeHtml(fmtWeight(s.weightLbs, true))} <span>× ${s.reps}</span></div>
+              <div class="row-actions">
+                <button class="mini" data-action="edit-set" data-id="${s.id}">Edit</button>
+                <button class="mini danger" data-action="delete-set" data-id="${s.id}">Delete</button>
+              </div>
+            </div>`).join("");
+          return `<section class="day-group">
+            <div class="day-head"><div class="when">${escapeHtml(formatDay(g.date))}</div><div class="vol">${escapeHtml(volTxt)}</div></div>
+            ${rows}
+          </section>`;
+        }).join("");
+      }
+
+      return `
+        <header class="topbar">
+          <button class="icon-btn" data-go="#/" aria-label="Back">${backIcon()}</button>
+          <h1>${escapeHtml(ex.name)}</h1>
+          <button class="icon-btn" data-action="ex-menu" aria-label="Exercise options">${dotsIcon()}</button>
+        </header>
+        <main class="screen">
+          <div class="pr-grid">
+            <div class="pr-card">
+              <div class="lbl">Heaviest</div>
+              <div class="val">${escapeHtml(heavy)}</div>
+              <div class="sub">${escapeHtml(hSub)}</div>
+            </div>
+            <div class="pr-card best">
+              <div class="lbl">Est. 1RM</div>
+              <div class="val">${escapeHtml(e1)}</div>
+              <div class="sub">${escapeHtml(eSub)}</div>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="lbl">Top set over time</div>
+            <div class="chart-wrap">${svgChart(points)}</div>
+          </div>
+          <div class="logger">
+            <div class="logger-grid">
+              <div class="stepper">
+                <div class="unit-lbl">Weight (${unit()})</div>
+                <input id="draft-weight" inputmode="decimal" type="text" value="${escapeHtml(draft.weight)}" aria-label="Weight">
+                <div class="step-row">
+                  <button class="step-btn" data-action="step-w" data-dir="-1" aria-label="Decrease weight">−</button>
+                  <button class="step-btn" data-action="step-w" data-dir="1" aria-label="Increase weight">+</button>
+                </div>
+              </div>
+              <div class="stepper">
+                <div class="unit-lbl">Reps</div>
+                <input id="draft-reps" inputmode="numeric" type="text" value="${escapeHtml(draft.reps)}" aria-label="Reps">
+                <div class="step-row">
+                  <button class="step-btn" data-action="step-r" data-dir="-1" aria-label="Decrease reps">−</button>
+                  <button class="step-btn" data-action="step-r" data-dir="1" aria-label="Increase reps">+</button>
+                </div>
+              </div>
+            </div>
+            <button class="add-set" data-action="add-set">Add set</button>
+          </div>
+          <div class="eyebrow">History</div>
+          ${history}
+        </main>`;
+    }
+
+    function groupSets(exId) {
+      const map = new Map();
+      for (const s of setsFor(exId).slice().reverse()) {
+        const k = todayKey(s.createdAt);
+        if (!map.has(k)) map.set(k, []);
+        map.get(k).push(s);
+      }
+      // Within a day, show chronological order (first set first)
+      return Array.from(map.entries()).map(([date, sets]) => ({
+        date,
+        sets: sets.slice().sort((a, b) => a.createdAt - b.createdAt)
+      }));
+    }
+
+    function renderSettings() {
+      const u = unit();
+      const count = state.sets.length;
+      return `
+        <header class="topbar">
+          <button class="icon-btn" data-go="#/" aria-label="Back">${backIcon()}</button>
+          <h1>Settings</h1>
+        </header>
+        <main class="screen">
+          <div class="eyebrow">Units</div>
+          <div class="settings-card">
+            <div class="settings-row">
+              <div>
+                <div class="k">Weight unit</div>
+                <div class="d">Used for logging and history</div>
+              </div>
+              <div class="seg" role="group" aria-label="Weight unit">
+                <button data-action="set-unit" data-unit="lbs" class="${u === "lbs" ? "on" : ""}">lbs</button>
+                <button data-action="set-unit" data-unit="kg" class="${u === "kg" ? "on" : ""}">kg</button>
+              </div>
+            </div>
+          </div>
+          <div class="eyebrow">Backup</div>
+          <div class="settings-card">
+            <button class="settings-row tappable" data-action="export-json">
+              <div>
+                <div class="k">Export JSON</div>
+                <div class="d">${count} set${count === 1 ? "" : "s"} · download a backup</div>
+              </div>
+              <span class="chev">${chevron()}</span>
+            </button>
+            <button class="settings-row tappable" data-action="import-json">
+              <div>
+                <div class="k">Import JSON</div>
+                <div class="d">Replace current data from a backup</div>
+              </div>
+              <span class="chev">${chevron()}</span>
+            </button>
+          </div>
+          <input id="import-file" type="file" accept="application/json,.json" hidden>
+          <p class="hint">Data stays on this phone in local storage. Export a backup before clearing the browser site data. Add Lift Log to your home screen for a full-screen gym view.</p>
+        </main>`;
+    }
+
+    function renderModal() {
+      if (modal.type === "add-exercise" || modal.type === "rename-exercise") {
+        const title = modal.type === "add-exercise" ? "New exercise" : "Rename exercise";
+        const val = modal.value || "";
+        return `<div class="overlay" data-action="close-modal">
+          <div class="sheet" role="dialog" aria-modal="true" aria-label="${title}">
+            <div class="grab"></div>
+            <h2>${title}</h2>
+            <label class="field-lbl" for="modal-name">Name</label>
+            <input class="text-input" id="modal-name" maxlength="60" value="${escapeHtml(val)}" placeholder="e.g. Romanian Deadlift">
+            <div class="sheet-actions">
+              <button class="btn ghost" data-action="close-modal">Cancel</button>
+              <button class="btn primary" data-action="save-exercise-name">${modal.type === "add-exercise" ? "Add" : "Save"}</button>
+            </div>
+          </div>
+        </div>`;
+      }
+      if (modal.type === "ex-menu") {
+        const ex = exerciseById(modal.id);
+        if (!ex) return "";
+        return `<div class="overlay" data-action="close-modal">
+          <div class="sheet" role="dialog" aria-modal="true" aria-label="Exercise options">
+            <div class="grab"></div>
+            <h2>${escapeHtml(ex.name)}</h2>
+            <div class="more-menu">
+              <button data-action="rename-exercise">Rename</button>
+              <button class="warn" data-action="confirm-delete-ex">Delete exercise</button>
+            </div>
+            <div class="sheet-actions">
+              <button class="btn ghost" data-action="close-modal">Close</button>
+            </div>
+          </div>
+        </div>`;
+      }
+      if (modal.type === "confirm-delete-ex") {
+        const ex = exerciseById(modal.id);
+        const n = setsFor(modal.id).length;
+        return `<div class="overlay" data-action="close-modal">
+          <div class="sheet" role="dialog" aria-modal="true" aria-label="Delete exercise">
+            <div class="grab"></div>
+            <h2>Delete ${escapeHtml(ex ? ex.name : "exercise")}?</h2>
+            <p class="hint">This removes the exercise and ${n} set${n === 1 ? "" : "s"}. This cannot be undone.</p>
+            <div class="sheet-actions">
+              <button class="btn ghost" data-action="close-modal">Cancel</button>
+              <button class="btn danger" data-action="delete-exercise">Delete</button>
+            </div>
+          </div>
+        </div>`;
+      }
+      if (modal.type === "edit-set") {
+        const s = state.sets.find(x => x.id === modal.id);
+        if (!s) return "";
+        return `<div class="overlay" data-action="close-modal">
+          <div class="sheet" role="dialog" aria-modal="true" aria-label="Edit set">
+            <div class="grab"></div>
+            <h2>Edit set</h2>
+            <div class="num-row">
+              <div>
+                <label class="field-lbl" for="edit-weight">Weight (${unit()})</label>
+                <input class="num-input" id="edit-weight" inputmode="decimal" value="${escapeHtml(fmtWeight(s.weightLbs, false))}">
+              </div>
+              <div>
+                <label class="field-lbl" for="edit-reps">Reps</label>
+                <input class="num-input" id="edit-reps" inputmode="numeric" value="${s.reps}">
+              </div>
+            </div>
+            <div class="sheet-actions">
+              <button class="btn ghost" data-action="close-modal">Cancel</button>
+              <button class="btn primary" data-action="save-set">Save</button>
+            </div>
+          </div>
+        </div>`;
+      }
+      if (modal.type === "confirm-import") {
+        return `<div class="overlay" data-action="close-modal">
+          <div class="sheet" role="dialog" aria-modal="true" aria-label="Replace data">
+            <div class="grab"></div>
+            <h2>Replace all data?</h2>
+            <p class="hint">Importing a backup overwrites your current exercises and sets on this phone.</p>
+            <div class="sheet-actions">
+              <button class="btn ghost" data-action="close-modal">Cancel</button>
+              <button class="btn primary" data-action="do-import">Import</button>
+            </div>
+          </div>
+        </div>`;
+      }
+      return "";
+    }
+
+    function barbellIcon() {
+      return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <rect x="2" y="8" width="3.2" height="8" rx="1" fill="#1a0a00"/>
+        <rect x="18.8" y="8" width="3.2" height="8" rx="1" fill="#1a0a00"/>
+        <rect x="5.4" y="9.5" width="2" height="5" rx="0.6" fill="#1a0a00"/>
+        <rect x="16.6" y="9.5" width="2" height="5" rx="0.6" fill="#1a0a00"/>
+        <rect x="7.6" y="11" width="8.8" height="2" rx="0.6" fill="#1a0a00"/>
+      </svg>`;
+    }
+    function gearIcon() {
+      return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9c.3.6.9 1 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path>
+      </svg>`;
+    }
+    function backIcon() {
+      return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>`;
+    }
+    function chevron() {
+      return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>`;
+    }
+    function dotsIcon() {
+      return `<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18" cy="12" r="1.7"/></svg>`;
+    }
+
+    function readDraftInputs() {
+      const w = document.getElementById("draft-weight");
+      const r = document.getElementById("draft-reps");
+      if (w) draft.weight = w.value;
+      if (r) draft.reps = r.value;
+    }
+
+    function parseWeight(str) {
+      const n = parseFloat(String(str).replace(",", "."));
+      if (!Number.isFinite(n) || n < 0) return null;
+      return n;
+    }
+    function parseReps(str) {
+      const n = parseInt(String(str), 10);
+      if (!Number.isFinite(n) || n < 1) return null;
+      return n;
+    }
+
+    function bind() {
+      document.querySelectorAll("[data-go]").forEach(el => {
+        el.addEventListener("click", (e) => {
+          e.preventDefault();
+          go(el.getAttribute("data-go"));
+        });
+      });
+
+      const overlay = document.querySelector(".overlay");
+      if (overlay) {
+        overlay.addEventListener("click", (e) => {
+          if (e.target === overlay) closeModal();
+        });
+        const sheet = overlay.querySelector(".sheet");
+        if (sheet) sheet.addEventListener("click", (e) => e.stopPropagation());
+      }
+
+      const nameInput = document.getElementById("modal-name");
+      if (nameInput && modal && (modal.type === "add-exercise" || modal.type === "rename-exercise")) {
+        setTimeout(() => { nameInput.focus(); nameInput.select(); }, 30);
+        nameInput.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") saveExerciseName();
+        });
+      }
+
+      document.querySelectorAll("[data-action]").forEach(el => {
+        el.addEventListener("click", (e) => {
+          const action = el.getAttribute("data-action");
+          if (action === "close-modal" && e.currentTarget.classList.contains("overlay") && e.target !== el) return;
+          handleAction(action, el);
+        });
+      });
+
+      const dw = document.getElementById("draft-weight");
+      const dr = document.getElementById("draft-reps");
+      if (dw) dw.addEventListener("input", () => { draft.weight = dw.value; });
+      if (dr) dr.addEventListener("input", () => { draft.reps = dr.value; });
+    }
+
+    function closeModal() {
+      modal = null;
+      render();
+    }
+
+    function handleAction(action, el) {
+      if (action === "close-modal") return closeModal();
+      if (action === "add-exercise") {
+        modal = { type: "add-exercise", value: "" };
+        return render();
+      }
+      if (action === "ex-menu") {
+        modal = { type: "ex-menu", id: route.id };
+        return render();
+      }
+      if (action === "rename-exercise") {
+        const ex = exerciseById(modal && modal.id || route.id);
+        modal = { type: "rename-exercise", id: ex && ex.id, value: ex ? ex.name : "" };
+        return render();
+      }
+      if (action === "confirm-delete-ex") {
+        modal = { type: "confirm-delete-ex", id: (modal && modal.id) || route.id };
+        return render();
+      }
+      if (action === "delete-exercise") {
+        const id = modal.id;
+        state.exercises = state.exercises.filter(e => e.id !== id);
+        state.sets = state.sets.filter(s => s.exerciseId !== id);
+        save();
+        modal = null;
+        showToast("Exercise deleted");
+        go("#/");
+        return;
+      }
+      if (action === "save-exercise-name") return saveExerciseName();
+      if (action === "step-w") {
+        readDraftInputs();
+        const cur = parseWeight(draft.weight);
+        const base = cur == null ? 0 : cur;
+        const next = Math.max(0, Math.round((base + Number(el.getAttribute("data-dir")) * weightStep()) * 10) / 10);
+        draft.weight = String(next);
+        draftExId = route.id;
+        return render();
+      }
+      if (action === "step-r") {
+        readDraftInputs();
+        const cur = parseReps(draft.reps);
+        const base = cur == null ? 0 : cur;
+        const next = Math.max(1, base + Number(el.getAttribute("data-dir")));
+        draft.reps = String(next);
+        draftExId = route.id;
+        return render();
+      }
+      if (action === "add-set") return addSet();
+      if (action === "edit-set") {
+        modal = { type: "edit-set", id: el.getAttribute("data-id") };
+        return render();
+      }
+      if (action === "save-set") return saveSetEdit();
+      if (action === "delete-set") {
+        const id = el.getAttribute("data-id");
+        state.sets = state.sets.filter(s => s.id !== id);
+        save();
+        showToast("Set deleted");
+        return;
+      }
+      if (action === "set-unit") {
+        const next = el.getAttribute("data-unit");
+        if (next === state.settings.unit) return;
+        state.settings.unit = next;
+        draftExId = null;
+        save();
+        showToast("Unit set to " + next);
+        return;
+      }
+      if (action === "export-json") return exportJson();
+      if (action === "import-json") {
+        const input = document.getElementById("import-file");
+        if (!input) return;
+        input.value = "";
+        input.onchange = () => {
+          const file = input.files && input.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            try {
+              const data = JSON.parse(reader.result);
+              if (!data || !Array.isArray(data.exercises) || !Array.isArray(data.sets)) {
+                showToast("That file isn’t a valid Lift Log backup");
+                return;
+              }
+              modal = { type: "confirm-import", data };
+              render();
+            } catch {
+              showToast("Couldn’t read that JSON file");
+            }
+          };
+          reader.readAsText(file);
+        };
+        input.click();
+        return;
+      }
+      if (action === "do-import") {
+        const data = modal.data;
+        state = {
+          version: 1,
+          settings: { unit: (data.settings && data.settings.unit) === "kg" ? "kg" : "lbs" },
+          exercises: data.exercises,
+          sets: data.sets
+        };
+        draftExId = null;
+        save();
+        modal = null;
+        showToast("Backup imported");
+        return;
+      }
+    }
+
+    function saveExerciseName() {
+      const input = document.getElementById("modal-name");
+      const name = (input ? input.value : (modal && modal.value) || "").trim();
+      if (!name) { showToast("Give the exercise a name"); return; }
+      const exists = state.exercises.some(e => e.name.toLowerCase() === name.toLowerCase() && e.id !== (modal && modal.id));
+      if (exists) { showToast("That exercise already exists"); return; }
+      if (modal.type === "add-exercise") {
+        const ex = { id: uid(), name, custom: true, createdAt: Date.now() };
+        state.exercises.push(ex);
+        save();
+        modal = null;
+        showToast("Exercise added");
+        go("#/exercise/" + encodeURIComponent(ex.id));
+        return;
+      }
+      const ex = exerciseById(modal.id);
+      if (ex) { ex.name = name; save(); }
+      modal = null;
+      showToast("Renamed");
+      render();
+    }
+
+    function addSet() {
+      readDraftInputs();
+      const w = parseWeight(draft.weight);
+      const r = parseReps(draft.reps);
+      if (w == null) { showToast("Enter a valid weight"); return; }
+      if (r == null) { showToast("Enter at least 1 rep"); return; }
+      state.sets.push({
+        id: uid(),
+        exerciseId: route.id,
+        weightLbs: toLbs(w),
+        reps: r,
+        createdAt: Date.now()
+      });
+      draft = { weight: String(w), reps: String(r) };
+      draftExId = route.id;
+      save();
+      showToast("Set logged");
+    }
+
+    function saveSetEdit() {
+      const s = state.sets.find(x => x.id === modal.id);
+      if (!s) return closeModal();
+      const w = parseWeight(document.getElementById("edit-weight").value);
+      const r = parseReps(document.getElementById("edit-reps").value);
+      if (w == null) { showToast("Enter a valid weight"); return; }
+      if (r == null) { showToast("Enter at least 1 rep"); return; }
+      s.weightLbs = toLbs(w);
+      s.reps = r;
+      save();
+      modal = null;
+      showToast("Set updated");
+    }
+
+    function exportJson() {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      const day = todayKey(Date.now());
+      a.href = URL.createObjectURL(blob);
+      a.download = "lift-log-backup-" + day + ".json";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+      showToast("Backup downloaded");
+    }
+
+    window.addEventListener("hashchange", () => {
+      route = parseHash();
+      if (route.name !== "exercise") draftExId = null;
+      modal = null;
+      render();
+    });
+
+    render();
+  })();
+  </script>
+</body>
+</html>
