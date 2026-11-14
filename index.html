@@ -11,8 +11,9 @@
   <meta name="apple-mobile-web-app-title" content="Lift Log">
   <meta name="application-name" content="Lift Log">
   <meta name="description" content="Log your lifts by exercise. Each account keeps its own history.">
-  <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Lift%20Log%22%2C%22short_name%22%3A%22Lift%20Log%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230b0b0d%22%2C%22theme_color%22%3A%22%230b0b0d%22%7D">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0b0d'/%3E%3Crect x='4' y='14' width='24' height='4' rx='1' fill='%23ff6a2a'/%3E%3Crect x='3' y='10' width='5' height='12' rx='1.5' fill='%23ffd7a8'/%3E%3Crect x='24' y='10' width='5' height='12' rx='1.5' fill='%23ffd7a8'/%3E%3C/svg%3E">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="favicon.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
   <title>Lift Log</title>
   <style>
     :root {
@@ -34,6 +35,8 @@
       --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
       --safe-t: env(safe-area-inset-top, 0px);
       --safe-b: env(safe-area-inset-bottom, 0px);
+      --safe-l: env(safe-area-inset-left, 0px);
+      --safe-r: env(safe-area-inset-right, 0px);
       --radius: 18px;
       --tap: 52px;
     }
@@ -62,6 +65,8 @@
       display: flex;
       flex-direction: column;
       padding-bottom: calc(24px + var(--safe-b));
+      padding-left: var(--safe-l);
+      padding-right: var(--safe-r);
     }
 
     .topbar {
@@ -478,6 +483,7 @@
       animation: pop 0.2s ease;
       max-width: calc(100% - 32px);
     }
+    body:has(#rest-sheet) .toast { bottom: calc(248px + var(--safe-b)); }
     @keyframes pop {
       from { transform: translateX(-50%) translateY(8px); opacity: 0; }
       to { transform: translateX(-50%); opacity: 1; }
@@ -746,26 +752,46 @@
       color: var(--accent-2);
       font-weight: 700;
     }
-    .rest-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin: 0 0 12px;
-      padding: 12px 14px;
-      border-radius: 16px;
+    .rest-sheet {
+      position: fixed;
+      left: 50%;
+      bottom: calc(12px + var(--safe-b));
+      transform: translateX(-50%);
+      width: min(440px, calc(100% - 16px));
+      z-index: 70;
       background: var(--accent);
       color: #1a0a00;
+      border-radius: 22px;
+      padding: 16px 14px 12px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
     }
-    .rest-bar .time { font-size: 28px; font-weight: 800; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
-    .rest-bar button {
-      min-height: 44px;
-      padding: 0 14px;
-      border-radius: 12px;
+    .rest-sheet.done { background: var(--good); }
+    .rest-kicker {
+      text-align: center;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+    }
+    .rest-sheet .time {
+      font-size: 72px;
+      font-weight: 800;
+      letter-spacing: -0.06em;
+      line-height: 0.95;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      margin: 2px 0 10px;
+    }
+    .rest-sheet.done .time { font-size: 28px; letter-spacing: -0.03em; line-height: 1.15; padding: 8px 0 12px; }
+    .rest-controls { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; }
+    .rest-controls button, .rest-sheet .ok {
+      min-height: 48px;
+      border-radius: 14px;
       background: #1a0a00;
-      color: var(--accent-2);
-      font-weight: 750;
+      color: #ffd7a8;
+      font-weight: 800;
+      font-size: 15px;
     }
+    .rest-sheet .ok { width: 100%; }
     .browse-lib {
       width: 100%;
       min-height: 52px;
@@ -1129,8 +1155,11 @@
     let activeWorkout = null;
     let workoutDrafts = {};
     let planDrafts = {};
-    let restUntil = 0;
+    let restSession = null;
     let restTick = 0;
+    let restAlerted = false;
+    let audioCtx = null;
+    let restSettings = { auto: true, seconds: 90, overrides: {} };
     let libQuery = "";
     let libEquip = "All";
     let libMuscle = "All";
@@ -1651,7 +1680,8 @@
         activeWorkout = null;
         workoutDrafts = {};
         planDrafts = {};
-        restUntil = 0;
+        restSession = null;
+        restAlerted = false;
         clearInterval(restTick);
         templatesMode = "local";
         modal = null;
@@ -1761,6 +1791,7 @@
       const showModal = screen !== "auth" && screen !== "loading" && screen !== "recovery" && screen !== "error";
       if (showModal && modal) html += renderModal();
       if (toastMsg) html += `<div class="toast" role="status">${escapeHtml(toastMsg)}</div>`;
+      if (session && restSession && screen !== "loading" && screen !== "auth" && screen !== "recovery") html += restSheetHtml();
       appEl.innerHTML = html;
       hydrateAuthFields();
       bind();
@@ -2031,6 +2062,15 @@
       }));
     }
 
+    function iosInstallTip() {
+      const ua = navigator.userAgent || "";
+      const ios = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      const safari = /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
+      const standalone = window.navigator.standalone === true || window.matchMedia("(display-mode: standalone)").matches;
+      if (!ios || !safari || standalone) return "";
+      return `<div class="eyebrow">Add to Home Screen</div>
+        <p class="hint">In Safari, tap Share, then Add to Home Screen. Lift Log opens full screen, clear of the notch and home bar.</p>`;
+    }
     function renderSettings() {
       const u = unit();
       const count = state.sets.length;
@@ -2069,6 +2109,29 @@
               </div>
             </div>
           </div>
+          <div class="eyebrow">Rest timer</div>
+          <div class="settings-card">
+            <div class="settings-row">
+              <div>
+                <div class="k">Auto-start</div>
+                <div class="d">After every logged set</div>
+              </div>
+              <div class="seg" role="group" aria-label="Auto-start rest timer">
+                <button data-action="rest-auto" data-on="1" class="${restSettings.auto ? "on" : ""}">On</button>
+                <button data-action="rest-auto" data-on="0" class="${restSettings.auto ? "" : "on"}">Off</button>
+              </div>
+            </div>
+            <div class="settings-row">
+              <div>
+                <div class="k">Default rest</div>
+                <div class="d">${formatClock(restSettings.seconds)} · 30s to 5 min</div>
+              </div>
+              <div class="seg" role="group" aria-label="Default rest">
+                <button data-action="rest-default" data-dir="-15" aria-label="Decrease default rest">−15</button>
+                <button data-action="rest-default" data-dir="15" aria-label="Increase default rest">+15</button>
+              </div>
+            </div>
+          </div>
           <div class="eyebrow">Backup</div>
           <div class="settings-card">
             <button class="settings-row tappable" data-action="export-json">
@@ -2087,7 +2150,8 @@
             </button>
           </div>
           <input id="import-file" type="file" accept="application/json,.json" hidden>
-          <p class="hint">Your sets are saved to this account. Export a backup anytime. Add Lift Log to your home screen for a full-screen gym view.</p>
+          <p class="hint">Your sets are saved to this account. Export a backup anytime.</p>
+          ${iosInstallTip()}
         </main>`;
     }
 
@@ -2503,7 +2567,13 @@
       if (action === "tpl-target") return changeTemplateTarget(el);
       if (action === "log-plan") return logPlannedSet(el.getAttribute("data-id"), parseInt(el.getAttribute("data-index"), 10));
       if (action === "wo-extra-set") return addExtraSet(el.getAttribute("data-id"));
-      if (action === "dismiss-rest") return dismissRest();
+      if (action === "rest-skip") return clearRest();
+      if (action === "rest-pause") return toggleRestPause();
+      if (action === "rest-adjust") return adjustRest(Number(el.getAttribute("data-dir")));
+      if (action === "rest-auto") return setRestAuto(el.getAttribute("data-on") === "1");
+      if (action === "rest-default") return setDefaultRest(Number(el.getAttribute("data-dir")));
+      if (action === "rest-ex") return setExerciseRest(el.getAttribute("data-name"), Number(el.getAttribute("data-dir")));
+      if (action === "rest-ex-clear") return clearExerciseRest(el.getAttribute("data-name"));
       if (action === "delete-template") return deleteTemplate(el.getAttribute("data-id"));
       if (action === "wo-step-w" || action === "wo-step-r") return stepWorkout(action, el);
       if (action === "wo-add-set") return addWorkoutSet(el.getAttribute("data-id"));
@@ -2675,6 +2745,8 @@
       try {
         await persistSetInsert(row, w);
         saving = false;
+        const ex = exerciseById(route.id);
+        maybeStartRest(ex && ex.name);
         showToast("Set logged");
       } catch (err) {
         state.sets = state.sets.filter(s => s.id !== row.id);
@@ -3139,14 +3211,12 @@
       const items = workoutItems();
       const progress = workoutProgress(items);
       const blocks = items.map(item => renderWorkoutExercise(item)).join("");
-      const rest = restMarkup();
       return `<header class="topbar">
           <button class="icon-btn" data-go="#/" aria-label="Back">${backIcon()}</button>
           <h1>${escapeHtml(activeWorkout.name)}</h1>
         </header>
         <main class="screen">
           <div class="wo-progress">${progress.done}/${progress.total} sets</div>
-          ${rest}
           ${blocks || `<div class="empty">No exercises left in this workout.</div>`}
           <button type="button" class="add-ex" data-action="wo-add-open" style="margin-top:4px">+ Add exercise</button>
           <div class="finish-bar">
@@ -3183,6 +3253,13 @@
           <button type="button" class="reorder-btn" data-action="tpl-target" data-id="${escapeHtml(t.id)}" data-index="${i}" data-field="reps" data-dir="-1" aria-label="Fewer reps for ${escapeHtml(name)}">−</button>
           <span class="target-val">${target.reps}</span>
           <button type="button" class="reorder-btn" data-action="tpl-target" data-id="${escapeHtml(t.id)}" data-index="${i}" data-field="reps" data-dir="1" aria-label="More reps for ${escapeHtml(name)}">+</button>
+        </div>
+        <div class="tpl-targets">
+          <span class="lbl">Rest</span>
+          <button type="button" class="reorder-btn" data-action="rest-ex" data-name="${escapeHtml(name)}" data-dir="-15" aria-label="Less rest for ${escapeHtml(name)}">−</button>
+          <span class="target-val">${formatClock(restSecondsFor(name))}</span>
+          <button type="button" class="reorder-btn" data-action="rest-ex" data-name="${escapeHtml(name)}" data-dir="15" aria-label="More rest for ${escapeHtml(name)}">+</button>
+          ${restOverride(name) ? `<button type="button" class="mini" data-action="rest-ex-clear" data-name="${escapeHtml(name)}">Default</button>` : ""}
         </div>
       </div>`;
       }).join("");
@@ -3256,6 +3333,8 @@
       try {
         await persistSetInsert(row, w);
         saving = false;
+        const ex = exerciseById(exId);
+        maybeStartRest(ex && ex.name);
         showToast("Set logged");
       } catch (err) {
         state.sets = state.sets.filter(s => s.id !== row.id);
@@ -3516,35 +3595,186 @@
       const r = s % 60;
       return m + ":" + String(r).padStart(2, "0");
     }
-    function restMarkup() {
-      if (!restUntil || restUntil <= Date.now()) return "";
-      const left = Math.ceil((restUntil - Date.now()) / 1000);
-      return `<div class="rest-bar" id="rest-bar">
-        <div><div class="lbl" style="letter-spacing:.08em">REST</div><div class="time" id="rest-clock">${formatClock(left)}</div></div>
-        <button type="button" data-action="dismiss-rest">Dismiss</button>
+    function loadRestSettings() {
+      try {
+        const raw = JSON.parse(localStorage.getItem("lift-log-rest-v1") || "null") || {};
+        const overrides = raw.overrides && typeof raw.overrides === "object" ? raw.overrides : {};
+        restSettings = {
+          auto: raw.auto !== false,
+          seconds: clampTarget(raw.seconds, 30, 300, 90),
+          overrides
+        };
+      } catch {
+        restSettings = { auto: true, seconds: 90, overrides: {} };
+      }
+    }
+    function saveRestSettings() {
+      const overrides = {};
+      Object.keys(restSettings.overrides || {}).forEach(key => {
+        const n = clampTarget(restSettings.overrides[key], 30, 300, 0);
+        if (n) overrides[key] = n;
+      });
+      restSettings.overrides = overrides;
+      localStorage.setItem("lift-log-rest-v1", JSON.stringify(restSettings));
+    }
+    function restOverride(name) {
+      if (!name) return 0;
+      const n = restSettings.overrides[String(name).toLowerCase()];
+      return n ? clampTarget(n, 30, 300, 0) : 0;
+    }
+    function restSecondsFor(name) {
+      return restOverride(name) || restSettings.seconds || 90;
+    }
+    function restRemainingMs() {
+      if (!restSession) return 0;
+      if (restSession.phase === "pause") return Math.max(0, restSession.remaining || 0);
+      if (restSession.phase === "run") return Math.max(0, (restSession.endsAt || 0) - Date.now());
+      return 0;
+    }
+    function restSheetHtml() {
+      if (!restSession) return "";
+      if (restSession.phase === "done") {
+        return `<div class="rest-sheet done" id="rest-sheet" role="status">
+          <div class="rest-kicker">REST OVER</div>
+          <div class="time" id="rest-clock">Rest over - next set</div>
+          <button type="button" class="ok" data-action="rest-skip">OK</button>
+        </div>`;
+      }
+      const left = Math.ceil(restRemainingMs() / 1000);
+      const paused = restSession.phase === "pause";
+      return `<div class="rest-sheet" id="rest-sheet" role="timer" aria-label="Rest timer">
+        <div class="rest-kicker">${paused ? "PAUSED" : "REST"}</div>
+        <div class="time" id="rest-clock">${formatClock(left)}</div>
+        <div class="rest-controls">
+          <button type="button" data-action="rest-adjust" data-dir="-15" aria-label="Subtract 15 seconds">−15s</button>
+          <button type="button" data-action="rest-pause">${paused ? "Resume" : "Pause"}</button>
+          <button type="button" data-action="rest-adjust" data-dir="15" aria-label="Add 15 seconds">+15s</button>
+          <button type="button" data-action="rest-skip">Skip</button>
+        </div>
       </div>`;
     }
-    function startRest() {
-      restUntil = Date.now() + 90000;
-      clearInterval(restTick);
-      restTick = setInterval(() => {
-        const left = Math.ceil((restUntil - Date.now()) / 1000);
-        if (left <= 0) {
-          restUntil = 0;
-          clearInterval(restTick);
-          const bar = document.getElementById("rest-bar");
-          if (bar) bar.remove();
-          return;
-        }
-        const el = document.getElementById("rest-clock");
-        if (el) el.textContent = formatClock(left);
-      }, 250);
+    function paintRest() {
+      const el = document.getElementById("rest-clock");
+      if (!el || !restSession || restSession.phase === "done") return;
+      el.textContent = formatClock(Math.ceil(restRemainingMs() / 1000));
     }
-    function dismissRest() {
-      restUntil = 0;
+    function unlockAudio() {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      if (!audioCtx) audioCtx = new AC();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+    }
+    function playBeep() {
+      if (!audioCtx) return;
+      const now = audioCtx.currentTime;
+      [0, 0.22].forEach(offset => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.0001, now + offset);
+        gain.gain.exponentialRampToValueAtTime(0.25, now + offset + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.18);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now + offset);
+        osc.stop(now + offset + 0.2);
+      });
+    }
+    function completeRest() {
+      if (!restSession || restSession.phase === "done") return;
+      restSession.phase = "done";
+      restSession.doneUntil = Date.now() + 8000;
+      if (!restAlerted) {
+        restAlerted = true;
+        try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch {}
+        try { playBeep(); } catch {}
+        try {
+          if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+            new Notification("Lift Log", { body: "Rest over - next set" });
+          }
+        } catch {}
+      }
+      render();
+    }
+    function syncRest() {
+      if (!restSession) return;
+      if (restSession.phase === "run" && Date.now() >= restSession.endsAt) {
+        completeRest();
+        return;
+      }
+      if (restSession.phase === "done" && Date.now() >= restSession.doneUntil) {
+        restSession = null;
+        restAlerted = false;
+        const el = document.getElementById("rest-sheet");
+        if (el) el.remove();
+        return;
+      }
+      paintRest();
+    }
+    function armRestTick() {
       clearInterval(restTick);
-      const bar = document.getElementById("rest-bar");
-      if (bar) bar.remove();
+      restTick = setInterval(syncRest, 250);
+    }
+    function maybeStartRest(name) {
+      if (!restSettings.auto) return;
+      const seconds = restSecondsFor(name);
+      restAlerted = false;
+      restSession = { phase: "run", endsAt: Date.now() + seconds * 1000, remaining: seconds * 1000 };
+      armRestTick();
+    }
+    function clearRest() {
+      restSession = null;
+      restAlerted = false;
+      clearInterval(restTick);
+      render();
+    }
+    function toggleRestPause() {
+      if (!restSession || restSession.phase === "done") return;
+      if (restSession.phase === "pause") {
+        restSession.endsAt = Date.now() + restSession.remaining;
+        restSession.phase = "run";
+      } else {
+        restSession.remaining = restRemainingMs();
+        restSession.phase = "pause";
+      }
+      render();
+    }
+    function adjustRest(deltaSeconds) {
+      if (!restSession || restSession.phase === "done") return;
+      let ms = restRemainingMs() + deltaSeconds * 1000;
+      ms = Math.max(0, Math.min(300000, ms));
+      if (restSession.phase === "pause") restSession.remaining = ms;
+      else restSession.endsAt = Date.now() + ms;
+      if (ms <= 0) completeRest();
+      else {
+        paintRest();
+        render();
+      }
+    }
+    function setRestAuto(on) {
+      restSettings.auto = !!on;
+      saveRestSettings();
+      render();
+    }
+    function setDefaultRest(delta) {
+      restSettings.seconds = clampTarget(restSettings.seconds + delta, 30, 300, 90);
+      saveRestSettings();
+      render();
+    }
+    function setExerciseRest(name, delta) {
+      if (!name) return;
+      const key = name.toLowerCase();
+      const current = restSecondsFor(name);
+      restSettings.overrides[key] = clampTarget(current + delta, 30, 300, 90);
+      saveRestSettings();
+      render();
+    }
+    function clearExerciseRest(name) {
+      if (!name) return;
+      delete restSettings.overrides[name.toLowerCase()];
+      saveRestSettings();
+      render();
     }
     function renderWorkoutExercise(item) {
       const id = item.exerciseId;
@@ -3605,8 +3835,9 @@
       state.sets.push(row);
       try {
         await persistSetInsert(row, w);
-        startRest();
         saving = false;
+        const loggedEx = exerciseById(exId);
+        maybeStartRest(loggedEx && loggedEx.name);
         showToast("Set " + (index + 1) + " logged");
       } catch (err) {
         state.sets = state.sets.filter(s => s.id !== row.id);
@@ -3835,6 +4066,16 @@
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && modal && modal.type !== "migrate-local" && !modal.busy) closeModal();
     });
+
+    loadRestSettings();
+    document.addEventListener("pointerdown", unlockAudio, { passive: true });
+    document.addEventListener("keydown", unlockAudio);
+    document.addEventListener("visibilitychange", syncRest);
+    window.addEventListener("focus", syncRest);
+    window.addEventListener("pageshow", syncRest);
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    }
 
     sb.auth.onAuthStateChange((event, sess) => onAuth(event, sess));
 
