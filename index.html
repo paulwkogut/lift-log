@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Lift Log">
   <meta name="application-name" content="Lift Log">
-  <meta name="description" content="Log your lifts by exercise. Fast, offline, just for you.">
+  <meta name="description" content="Log your lifts by exercise. Each account keeps its own history.">
   <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Lift%20Log%22%2C%22short_name%22%3A%22Lift%20Log%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230b0b0d%22%2C%22theme_color%22%3A%22%230b0b0d%22%7D">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0b0d'/%3E%3Crect x='4' y='14' width='24' height='4' rx='1' fill='%23ff6a2a'/%3E%3Crect x='3' y='10' width='5' height='12' rx='1.5' fill='%23ffd7a8'/%3E%3Crect x='24' y='10' width='5' height='12' rx='1.5' fill='%23ffd7a8'/%3E%3C/svg%3E">
   <title>Lift Log</title>
@@ -500,68 +500,204 @@
     }
     .more-menu button:active { background: var(--surface-2); }
     .more-menu button.warn { color: var(--danger); }
+
+    .settings-row > div:first-child { min-width: 0; flex: 1; }
+    .settings-row .d { overflow-wrap: anywhere; }
+
+    .auth-card {
+      background: linear-gradient(180deg, #1a1a22 0%, var(--surface) 100%);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 18px 16px 16px;
+      margin-top: 8px;
+      box-shadow: var(--shadow);
+    }
+    .auth-card h2 {
+      margin: 0 0 6px;
+      font-size: 22px;
+      letter-spacing: -0.03em;
+    }
+    .auth-lead {
+      color: var(--muted);
+      font-size: 14px;
+      margin: 0 0 16px;
+      line-height: 1.45;
+    }
+    .auth-links { display: flex; flex-direction: column; margin-top: 6px; }
+    .auth-link {
+      min-height: 44px;
+      padding: 10px 8px;
+      color: var(--accent-2);
+      font-weight: 650;
+      width: 100%;
+      text-align: center;
+    }
+    .auth-link:active { opacity: 0.7; }
+    .form-error {
+      color: var(--danger);
+      background: var(--danger-dim);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 14px;
+      margin: 0 0 12px;
+      line-height: 1.4;
+    }
+    .form-note {
+      color: var(--accent-2);
+      background: var(--accent-dim);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 14px;
+      margin: 0 0 12px;
+      line-height: 1.4;
+    }
+    .status-block {
+      min-height: 52dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 12px;
+      color: var(--muted);
+      padding: 12px 8px 24px;
+    }
+    .status-block h2 { color: var(--text); margin: 0; font-size: 20px; letter-spacing: -0.02em; }
+    .status-block .add-set { width: min(100%, 320px); }
+    .status-block .form-error { width: min(100%, 320px); text-align: left; }
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 3px solid var(--line);
+      border-top-color: var(--accent);
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .btn:disabled, .add-set:disabled { opacity: 0.45; }
+    @media (prefers-reduced-motion: reduce) {
+      .spinner { animation: none; }
+    }
+
   </style>
 </head>
 <body>
   <div id="app"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
   (function () {
-    const STORAGE_KEY = "lift-log-v1";
+    const SUPABASE_URL = "https://iogspfmaiiurwgjjjteq.supabase.co";
+    const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_JSGO5NWKQlyYPv8a60sLaQ_0UxNc7oc";
+    const LEGACY_KEY = "lift-log-v1";
     const LB_PER_KG = 2.2046226218;
     const DEFAULT_NAMES = [
       "Bench Press", "Squat", "Deadlift", "Overhead Press",
       "Barbell Row", "Pull-up", "Lat Pulldown", "Dumbbell Curl", "Leg Press"
     ];
 
-    const $ = (sel, el = document) => el.querySelector(sel);
-    const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-
-    function defaultExercises() {
-      return DEFAULT_NAMES.map((name, i) => ({
-        id: "ex-" + (i + 1),
-        name,
-        custom: false,
-        createdAt: Date.now()
-      }));
+    const appEl = document.getElementById("app");
+    if (!window.supabase || typeof window.supabase.createClient !== "function") {
+      appEl.innerHTML = statusBlock("Couldn't load the sign-in library. Check your connection and refresh.", false);
+      return;
     }
 
-    function emptyState() {
-      return {
-        version: 1,
-        settings: { unit: "lbs" },
-        exercises: defaultExercises(),
-        sets: []
-      };
+    let sb;
+    try {
+      sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+          // Implicit flow puts the recovery tokens in the URL hash and emits PASSWORD_RECOVERY.
+          flowType: "implicit",
+          storage: window.localStorage
+        }
+      });
+    } catch (err) {
+      appEl.innerHTML = statusBlock("Couldn't start sign-in. Refresh and try again.", false);
+      return;
     }
 
-    function load() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return emptyState();
-        const data = JSON.parse(raw);
-        if (!data || !Array.isArray(data.exercises) || !Array.isArray(data.sets)) return emptyState();
-        data.settings = data.settings || { unit: "lbs" };
-        if (data.settings.unit !== "kg") data.settings.unit = "lbs";
-        return data;
-      } catch {
-        return emptyState();
-      }
-    }
-
-    function save() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    }
-
-    let state = load();
+    let state = blankState();
     let route = parseHash();
     let modal = null;
     let toastTimer = 0;
     let toastMsg = "";
     let draft = { weight: "", reps: "" };
     let draftExId = null;
+    let session = null;
+    let authMode = "login";
+    let authForm = { email: "", password: "", password2: "" };
+    let authError = readAuthHashError();
+    let authNotice = "";
+    let authBusy = false;
+    let authResolved = false;
+    let recoveryMode = hashSignalsRecovery();
+    let loading = false;
+    let bootError = "";
+    let dataReadyFor = null;
+    let loadSeq = 0;
+    let accountLoad = null;
+    let saving = false;
+    let focusAuthField = "";
+
+    function blankState() {
+      return { version: 2, settings: { unit: "lbs" }, exercises: [], sets: [] };
+    }
+
+    function statusBlock(message, spinning) {
+      return `<header class="topbar"><div class="brand"><div class="brand-mark" aria-hidden="true">${barbellIcon()}</div><h1>Lift Log</h1></div></header>
+        <main class="screen"><div class="status-block">
+          ${spinning ? '<div class="spinner" aria-hidden="true"></div>' : ""}
+          <h2>${escapeHtml(message)}</h2>
+        </div></main>`;
+    }
+
+    function uid() {
+      if (globalThis.crypto && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+      return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        const v = c === "x" ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
+
+    function hashSignalsRecovery() {
+      return /type=recovery/.test(location.hash) || /type=recovery/.test(location.search);
+    }
+
+    function isAuthHash(hash) {
+      return /access_token=|refresh_token=|error=|type=/.test(hash || "");
+    }
+
+    function readAuthHashError() {
+      const raw = (location.hash || "").replace(/^#/, "");
+      if (!raw || raw.startsWith("/") || raw.indexOf("error=") === -1) return "";
+      const params = new URLSearchParams(raw);
+      return (params.get("error_description") || params.get("error") || "").replace(/\+/g, " ");
+    }
+
+    function stripAuthParams() {
+      const hash = location.hash || "";
+      const search = location.search || "";
+      if (!isAuthHash(hash) && !/[?&]code=/.test(search)) return;
+      const url = new URL(location.href);
+      url.hash = "";
+      url.searchParams.delete("code");
+      history.replaceState(null, "", url.pathname + url.search);
+      route = parseHash();
+    }
+
+    function currentPageUrl() {
+      const url = new URL(location.href);
+      url.hash = "";
+      return url.toString();
+    }
 
     function parseHash() {
-      const h = (location.hash || "#/").replace(/^#/, "") || "/";
+      const raw = location.hash || "";
+      if (isAuthHash(raw)) return { name: "home" };
+      const h = raw.replace(/^#/, "") || "/";
       if (h === "/settings") return { name: "settings" };
       const m = h.match(/^\/exercise\/([^/]+)$/);
       if (m) return { name: "exercise", id: decodeURIComponent(m[1]) };
@@ -569,7 +705,8 @@
     }
 
     function go(hash) {
-      location.hash = hash;
+      if (location.hash === hash) render();
+      else location.hash = hash;
     }
 
     function unit() { return state.settings.unit; }
@@ -580,6 +717,12 @@
     function toLbs(val) {
       if (unit() === "kg") return val * LB_PER_KG;
       return val;
+    }
+    function toLbsFrom(weight, fromUnit) {
+      const n = typeof weight === "number" ? weight : parseFloat(weight);
+      if (!Number.isFinite(n)) return 0;
+      if (fromUnit === "kg") return n * LB_PER_KG;
+      return n;
     }
     function fmtWeight(lbs, withUnit) {
       const n = toDisplay(lbs);
@@ -613,9 +756,33 @@
     }
     function repLabel(n) { return n === 1 ? "1 rep" : n + " reps"; }
     function escapeHtml(s) {
-      return String(s).replace(/[&<>"']/g, c => ({
-        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      return String(s).replace(/[&<>"'`]/g, c => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;", "`": "&#96;"
       }[c]));
+    }
+    function toIso(ts) {
+      const n = typeof ts === "number" ? ts : Date.parse(ts);
+      if (!Number.isFinite(n)) return new Date().toISOString();
+      return new Date(n).toISOString();
+    }
+    function asError(error, fallback) {
+      const err = new Error((error && error.message) || fallback || "Something went wrong.");
+      if (error && error.code) err.code = error.code;
+      return err;
+    }
+    function migrationFlag() {
+      return "lift-log-v1-migrated:" + (session && session.user ? session.user.id : "");
+    }
+    function readLegacy() {
+      try {
+        const raw = localStorage.getItem(LEGACY_KEY);
+        if (!raw) return null;
+        const data = JSON.parse(raw);
+        if (!data || !Array.isArray(data.exercises) || !Array.isArray(data.sets)) return null;
+        return data;
+      } catch {
+        return null;
+      }
     }
 
     function setsFor(exId) {
@@ -657,16 +824,347 @@
       }
       draftExId = exId;
     }
-
     function showToast(msg) {
       toastMsg = msg;
       clearTimeout(toastTimer);
       toastTimer = setTimeout(() => { toastMsg = ""; render(); }, 1800);
       render();
     }
-
     function exerciseById(id) {
       return state.exercises.find(e => e.id === id);
+    }
+    function signedInEmail() {
+      return (session && session.user && session.user.email) || "";
+    }
+
+    function applyServerState(exercises, sets, settings) {
+      state = {
+        version: 2,
+        settings: { unit: settings && settings.unit === "kg" ? "kg" : "lbs" },
+        exercises: (exercises || []).map(ex => ({
+          id: ex.id,
+          name: ex.name,
+          custom: !!ex.custom,
+          createdAt: ex.created_at ? new Date(ex.created_at).getTime() : Date.now()
+        })),
+        sets: (sets || []).map(s => ({
+          id: s.id,
+          exerciseId: s.exercise_id,
+          weightLbs: toLbsFrom(s.weight, s.unit),
+          reps: parseInt(s.reps, 10),
+          createdAt: new Date(s.performed_at).getTime()
+        }))
+      };
+    }
+
+    async function fetchAll() {
+      const [exRes, setRes, settingsRes] = await Promise.all([
+        sb.from("exercises").select("id,name,custom,created_at").order("created_at", { ascending: true }),
+        sb.from("sets").select("id,exercise_id,weight,reps,unit,performed_at").order("performed_at", { ascending: true }),
+        sb.from("user_settings").select("unit").maybeSingle()
+      ]);
+      if (exRes.error) throw asError(exRes.error, "Couldn't load exercises.");
+      if (setRes.error) throw asError(setRes.error, "Couldn't load sets.");
+      if (settingsRes.error) throw asError(settingsRes.error, "Couldn't load settings.");
+      return {
+        exercises: exRes.data || [],
+        sets: setRes.data || [],
+        settings: settingsRes.data
+      };
+    }
+
+    async function seedAccount(uid) {
+      const rows = DEFAULT_NAMES.map(name => ({ user_id: uid, name, custom: false }));
+      const ex = await sb.from("exercises").insert(rows);
+      if (ex.error) throw asError(ex.error, "Couldn't set up your exercises.");
+      const st = await sb.from("user_settings").insert({ user_id: uid, unit: "lbs" });
+      if (st.error) throw asError(st.error, "Couldn't set up your settings.");
+    }
+
+    function offerMigration() {
+      if (!session || !session.user) return;
+      if (localStorage.getItem(migrationFlag())) return;
+      const data = readLegacy();
+      if (!data) return;
+      modal = { type: "migrate-local", data };
+    }
+
+    function loadAccount() {
+      if (accountLoad) return accountLoad;
+      accountLoad = doLoad().finally(() => { accountLoad = null; });
+      return accountLoad;
+    }
+
+    async function doLoad() {
+      const seq = ++loadSeq;
+      const uid = session && session.user && session.user.id;
+      if (!uid) return;
+      loading = true;
+      bootError = "";
+      render();
+      try {
+        let pack = await fetchAll();
+        if (seq !== loadSeq) return;
+        const brandNew = !pack.settings && pack.exercises.length === 0 && pack.sets.length === 0;
+        if (brandNew) {
+          await seedAccount(uid);
+          if (seq !== loadSeq) return;
+          pack = await fetchAll();
+        } else if (!pack.settings) {
+          const st = await sb.from("user_settings").insert({ user_id: uid, unit: "lbs" });
+          if (st.error) throw asError(st.error, "Couldn't set up your settings.");
+          pack.settings = { unit: "lbs" };
+        }
+        if (seq !== loadSeq) return;
+        applyServerState(pack.exercises, pack.sets, pack.settings);
+        dataReadyFor = uid;
+        loading = false;
+        bootError = "";
+        offerMigration();
+        render();
+      } catch (err) {
+        if (seq !== loadSeq) return;
+        console.error(err);
+        loading = false;
+        bootError = err.message || "Couldn't load your log.";
+        render();
+      }
+    }
+
+    async function persistExerciseInsert(ex) {
+      const res = await sb.from("exercises").insert({
+        id: ex.id,
+        user_id: session.user.id,
+        name: ex.name,
+        custom: !!ex.custom,
+        created_at: new Date(ex.createdAt).toISOString()
+      });
+      if (res.error) throw asError(res.error, "Couldn't add that exercise.");
+    }
+
+    async function persistExerciseName(id, name) {
+      const res = await sb.from("exercises").update({ name }).eq("id", id);
+      if (res.error) throw asError(res.error, "Couldn't rename that exercise.");
+    }
+
+    async function persistExerciseDelete(id) {
+      const res = await sb.from("exercises").delete().eq("id", id);
+      if (res.error) throw asError(res.error, "Couldn't delete that exercise.");
+    }
+
+    async function persistSetInsert(row, displayWeight) {
+      const res = await sb.from("sets").insert({
+        id: row.id,
+        user_id: session.user.id,
+        exercise_id: row.exerciseId,
+        weight: displayWeight,
+        reps: row.reps,
+        unit: unit(),
+        performed_at: new Date(row.createdAt).toISOString()
+      });
+      if (res.error) throw asError(res.error, "Couldn't log that set.");
+    }
+
+    async function persistSetUpdate(id, displayWeight, reps) {
+      const res = await sb.from("sets").update({
+        weight: displayWeight,
+        reps,
+        unit: unit()
+      }).eq("id", id);
+      if (res.error) throw asError(res.error, "Couldn't update that set.");
+    }
+
+    async function persistSetDelete(id) {
+      const res = await sb.from("sets").delete().eq("id", id);
+      if (res.error) throw asError(res.error, "Couldn't delete that set.");
+    }
+
+    async function persistUnit(next) {
+      const res = await sb.from("user_settings").upsert({
+        user_id: session.user.id,
+        unit: next,
+        updated_at: new Date().toISOString()
+      }, { onConflict: "user_id" });
+      if (res.error) throw asError(res.error, "Couldn't update units.");
+    }
+
+    function rowsFromBackup(data) {
+      const idMap = new Map();
+      const seen = new Map();
+      const exRows = [];
+      for (const ex of data.exercises) {
+        const name = String((ex && ex.name) || "").trim().slice(0, 60);
+        if (!name) continue;
+        const key = name.toLowerCase();
+        if (seen.has(key)) {
+          if (ex.id != null) idMap.set(ex.id, seen.get(key));
+          continue;
+        }
+        const id = uid();
+        seen.set(key, id);
+        if (ex.id != null) idMap.set(ex.id, id);
+        exRows.push({
+          id,
+          user_id: session.user.id,
+          name,
+          custom: !!(ex && ex.custom),
+          created_at: toIso(ex && ex.createdAt)
+        });
+      }
+      const setRows = [];
+      for (const s of data.sets) {
+        const exerciseId = idMap.get(s.exerciseId);
+        if (!exerciseId) continue;
+        const weight = toLbsFrom(s.weightLbs, "lbs");
+        const reps = parseInt(s.reps, 10);
+        if (!Number.isFinite(weight) || weight < 0 || !Number.isFinite(reps) || reps < 1) continue;
+        setRows.push({
+          id: uid(),
+          user_id: session.user.id,
+          exercise_id: exerciseId,
+          weight,
+          reps,
+          unit: "lbs",
+          performed_at: toIso(s.createdAt)
+        });
+      }
+      const unitName = data.settings && data.settings.unit === "kg" ? "kg" : "lbs";
+      return { exRows, setRows, unitName };
+    }
+
+    async function replaceWithBackup(data) {
+      const built = rowsFromBackup(data);
+      const uidNow = session.user.id;
+      const deleted = await sb.from("exercises").delete().eq("user_id", uidNow);
+      if (deleted.error) throw asError(deleted.error, "Couldn't replace your log.");
+      if (built.exRows.length) {
+        const ex = await sb.from("exercises").insert(built.exRows);
+        if (ex.error) throw asError(ex.error, "Couldn't import exercises.");
+      }
+      if (built.setRows.length) {
+        const sets = await sb.from("sets").insert(built.setRows);
+        if (sets.error) throw asError(sets.error, "Couldn't import sets.");
+      }
+      await persistUnit(built.unitName);
+    }
+
+    async function mergeLegacy(data) {
+      const nameToId = new Map(state.exercises.map(e => [e.name.trim().toLowerCase(), e.id]));
+      const idMap = new Map();
+      const newRows = [];
+      for (const ex of data.exercises) {
+        const name = String((ex && ex.name) || "").trim().slice(0, 60);
+        if (!name) continue;
+        const key = name.toLowerCase();
+        let id = nameToId.get(key);
+        if (!id) {
+          id = uid();
+          nameToId.set(key, id);
+          newRows.push({
+            id,
+            user_id: session.user.id,
+            name,
+            custom: ex.custom !== false,
+            created_at: toIso(ex.createdAt)
+          });
+        }
+        if (ex.id != null) idMap.set(ex.id, id);
+      }
+      if (newRows.length) {
+        const ex = await sb.from("exercises").insert(newRows);
+        if (ex.error) throw asError(ex.error, "Couldn't import exercises.");
+      }
+      const setRows = [];
+      for (const s of data.sets) {
+        const exerciseId = idMap.get(s.exerciseId);
+        if (!exerciseId) continue;
+        const weight = toLbsFrom(s.weightLbs, "lbs");
+        const reps = parseInt(s.reps, 10);
+        if (!Number.isFinite(weight) || weight < 0 || !Number.isFinite(reps) || reps < 1) continue;
+        setRows.push({
+          id: uid(),
+          user_id: session.user.id,
+          exercise_id: exerciseId,
+          weight,
+          reps,
+          unit: "lbs",
+          performed_at: toIso(s.createdAt)
+        });
+      }
+      if (setRows.length) {
+        const sets = await sb.from("sets").insert(setRows);
+        if (sets.error) throw asError(sets.error, "Couldn't import sets.");
+      }
+      if (data.settings && (data.settings.unit === "kg" || data.settings.unit === "lbs")) {
+        await persistUnit(data.settings.unit);
+      }
+    }
+
+    function onAuth(event, sess) {
+      if (event === "PASSWORD_RECOVERY") recoveryMode = true;
+      if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
+        if (sess) session = sess;
+        return;
+      }
+      const next = (!sess || event === "SIGNED_OUT") ? null : sess;
+      if (!next) {
+        session = null;
+        loadSeq++;
+      } else {
+        session = next;
+        if (!recoveryMode && dataReadyFor !== next.user.id) {
+          loading = true;
+          bootError = "";
+        }
+      }
+      setTimeout(() => bootFromSession(event, next), 0);
+    }
+
+    function bootFromSession(event, sess) {
+      if (recoveryMode && sess && (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN" || event === "INITIAL_SESSION")) {
+        session = sess;
+        authResolved = true;
+        loading = false;
+        stripAuthParams();
+        render();
+        return;
+      }
+      if (!sess) {
+        const failedRecovery = recoveryMode;
+        session = null;
+        recoveryMode = false;
+        dataReadyFor = null;
+        state = blankState();
+        modal = null;
+        draft = { weight: "", reps: "" };
+        draftExId = null;
+        loading = false;
+        bootError = "";
+        authResolved = true;
+        authBusy = false;
+        authMode = "login";
+        authNotice = "";
+        authForm.password = "";
+        authForm.password2 = "";
+        if (failedRecovery) {
+          authMode = "forgot";
+          authError = authError || "This reset link is invalid or expired.";
+        } else {
+          authError = "";
+        }
+        stripAuthParams();
+        render();
+        return;
+      }
+      session = sess;
+      authResolved = true;
+      stripAuthParams();
+      if (dataReadyFor === sess.user.id && !bootError) {
+        loading = false;
+        render();
+        return;
+      }
+      loadAccount();
     }
 
     function svgChart(points) {
@@ -708,22 +1206,48 @@
       </svg>`;
     }
 
+    function screenName() {
+      if (recoveryMode) return "recovery";
+      if (!authResolved || (session && loading)) return "loading";
+      if (!session) return "auth";
+      if (bootError) return "error";
+      if (route.name === "settings") return "settings";
+      if (route.name === "exercise") return "exercise";
+      return "home";
+    }
+
     function render() {
-      const app = document.getElementById("app");
       const scrollY = window.scrollY;
       const active = document.activeElement;
       const activeId = active && active.id;
       const activePos = active && typeof active.selectionStart === "number" ? [active.selectionStart, active.selectionEnd] : null;
+      const screen = screenName();
+      appEl.dataset.screen = screen;
 
       let html = "";
-      if (route.name === "settings") html = renderSettings();
-      else if (route.name === "exercise") html = renderExercise();
+      if (screen === "recovery") html = renderRecovery();
+      else if (screen === "loading") html = renderLoading();
+      else if (screen === "auth") html = renderAuth();
+      else if (screen === "error") html = renderBootError();
+      else if (screen === "settings") html = renderSettings();
+      else if (screen === "exercise") html = renderExercise();
       else html = renderHome();
-      if (modal) html += renderModal();
+
+      const showModal = screen !== "auth" && screen !== "loading" && screen !== "recovery" && screen !== "error";
+      if (showModal && modal) html += renderModal();
       if (toastMsg) html += `<div class="toast" role="status">${escapeHtml(toastMsg)}</div>`;
-      app.innerHTML = html;
+      appEl.innerHTML = html;
+      hydrateAuthFields();
       bind();
 
+      if (focusAuthField) {
+        const preferred = document.getElementById(focusAuthField);
+        focusAuthField = "";
+        if (preferred) {
+          preferred.focus();
+          return;
+        }
+      }
       if (activeId) {
         const el = document.getElementById(activeId);
         if (el) {
@@ -735,6 +1259,99 @@
       } else {
         window.scrollTo(0, scrollY);
       }
+    }
+
+    function hydrateAuthFields() {
+      const email = document.getElementById("auth-email");
+      const password = document.getElementById("auth-password");
+      const password2 = document.getElementById("auth-password2");
+      if (email) email.value = authForm.email;
+      if (password) password.value = authForm.password;
+      if (password2) password2.value = authForm.password2;
+    }
+
+    function brandHeader(extra) {
+      return `<header class="topbar"><div class="brand"><div class="brand-mark" aria-hidden="true">${barbellIcon()}</div><h1>Lift Log</h1></div>${extra || ""}</header>`;
+    }
+
+    function renderLoading() {
+      const label = session ? "Loading your log…" : "Loading…";
+      return brandHeader() + `<main class="screen"><div class="status-block" role="status">
+        <div class="spinner" aria-hidden="true"></div>
+        <h2>${label}</h2>
+      </div></main>`;
+    }
+
+    function renderBootError() {
+      return brandHeader() + `<main class="screen"><div class="status-block">
+        <h2>Couldn't load your log</h2>
+        <p class="form-error" role="alert">${escapeHtml(bootError)}</p>
+        <button class="add-set" data-action="retry-load">Try again</button>
+        <button class="auth-link" data-action="log-out">Log out</button>
+      </div></main>`;
+    }
+
+    function renderAuth() {
+      const mode = authMode === "signup" || authMode === "forgot" ? authMode : "login";
+      const title = mode === "signup" ? "Create your account" : mode === "forgot" ? "Reset password" : "Welcome back";
+      const lead = mode === "signup"
+        ? "Your exercises and sets stay with this account."
+        : mode === "forgot"
+          ? "We'll email a reset link that opens this page."
+          : "Log lifts by exercise. Each account keeps its own history.";
+      const submit = mode === "signup" ? "Sign up" : mode === "forgot" ? "Send reset link" : "Log in";
+      const busyLabel = mode === "signup" ? "Creating account…" : mode === "forgot" ? "Sending…" : "Logging in…";
+      const passwordAuto = mode === "signup" ? "new-password" : "current-password";
+      const alert = authError
+        ? `<p class="form-error" role="alert">${escapeHtml(authError)}</p>`
+        : authNotice
+          ? `<p class="form-note" role="status">${escapeHtml(authNotice)}</p>`
+          : "";
+      const passwords = mode === "forgot" ? "" : `
+        <label class="field-lbl" for="auth-password">Password</label>
+        <input class="text-input" id="auth-password" name="password" type="password" autocomplete="${passwordAuto}" aria-label="Password">
+        ${mode === "signup" ? `<label class="field-lbl" for="auth-password2">Confirm password</label>
+        <input class="text-input" id="auth-password2" name="password2" type="password" autocomplete="new-password" aria-label="Confirm password">` : ""}`;
+      const links = mode === "login"
+        ? `<button type="button" class="auth-link" data-action="auth-mode" data-mode="forgot">Forgot password</button>
+           <button type="button" class="auth-link" data-action="auth-mode" data-mode="signup">Need an account? Sign up</button>`
+        : mode === "signup"
+          ? `<button type="button" class="auth-link" data-action="auth-mode" data-mode="login">Already have an account? Log in</button>`
+          : `<button type="button" class="auth-link" data-action="auth-mode" data-mode="login">Back to log in</button>`;
+      return brandHeader() + `<main class="screen"><div class="auth-card">
+        <h2>${title}</h2>
+        <p class="auth-lead">${lead}</p>
+        ${alert}
+        <form id="auth-form" novalidate>
+          <label class="field-lbl" for="auth-email">Email</label>
+          <input class="text-input" id="auth-email" name="email" type="email" inputmode="email" autocomplete="username" aria-label="Email">
+          ${passwords}
+          <button class="add-set" type="submit" ${authBusy ? "disabled" : ""}>${authBusy ? busyLabel : submit}</button>
+        </form>
+        <div class="auth-links">${links}</div>
+      </div></main>`;
+    }
+
+    function renderRecovery() {
+      if (!session) {
+        return brandHeader() + `<main class="screen"><div class="status-block" role="status">
+          <div class="spinner" aria-hidden="true"></div>
+          <h2>Checking your reset link…</h2>
+        </div></main>`;
+      }
+      const alert = authError ? `<p class="form-error" role="alert">${escapeHtml(authError)}</p>` : "";
+      return brandHeader() + `<main class="screen"><div class="auth-card">
+        <h2>Set a new password</h2>
+        <p class="auth-lead">${escapeHtml(signedInEmail() || "Choose a new password for your account.")}</p>
+        ${alert}
+        <form id="recovery-form" novalidate>
+          <label class="field-lbl" for="auth-password">New password</label>
+          <input class="text-input" id="auth-password" name="password" type="password" autocomplete="new-password" aria-label="New password">
+          <label class="field-lbl" for="auth-password2">Confirm password</label>
+          <input class="text-input" id="auth-password2" name="password2" type="password" autocomplete="new-password" aria-label="Confirm password">
+          <button class="add-set" type="submit" ${authBusy ? "disabled" : ""}>${authBusy ? "Saving…" : "Update password"}</button>
+        </form>
+      </div></main>`;
     }
 
     function renderHome() {
@@ -863,7 +1480,7 @@
                 </div>
               </div>
             </div>
-            <button class="add-set" data-action="add-set">Add set</button>
+            <button class="add-set" data-action="add-set" ${saving ? "disabled" : ""}>Add set</button>
           </div>
           <div class="eyebrow">History</div>
           ${history}
@@ -887,12 +1504,28 @@
     function renderSettings() {
       const u = unit();
       const count = state.sets.length;
+      const email = signedInEmail();
       return `
         <header class="topbar">
           <button class="icon-btn" data-go="#/" aria-label="Back">${backIcon()}</button>
           <h1>Settings</h1>
         </header>
         <main class="screen">
+          <div class="eyebrow">Account</div>
+          <div class="settings-card">
+            <div class="settings-row">
+              <div>
+                <div class="k">Signed in</div>
+                <div class="d">${escapeHtml(email)}</div>
+              </div>
+            </div>
+            <button class="settings-row tappable" data-action="log-out">
+              <div>
+                <div class="k">Log out</div>
+                <div class="d">End this session on this phone</div>
+              </div>
+            </button>
+          </div>
           <div class="eyebrow">Units</div>
           <div class="settings-card">
             <div class="settings-row">
@@ -924,11 +1557,12 @@
             </button>
           </div>
           <input id="import-file" type="file" accept="application/json,.json" hidden>
-          <p class="hint">Data stays on this phone in local storage. Export a backup before clearing the browser site data. Add Lift Log to your home screen for a full-screen gym view.</p>
+          <p class="hint">Your sets are saved to this account. Export a backup anytime. Add Lift Log to your home screen for a full-screen gym view.</p>
         </main>`;
     }
 
     function renderModal() {
+      if (!modal) return "";
       if (modal.type === "add-exercise" || modal.type === "rename-exercise") {
         const title = modal.type === "add-exercise" ? "New exercise" : "Rename exercise";
         const val = modal.value || "";
@@ -1002,14 +1636,35 @@
         </div>`;
       }
       if (modal.type === "confirm-import") {
+        const busy = modal.busy ? "disabled" : "";
         return `<div class="overlay" data-action="close-modal">
           <div class="sheet" role="dialog" aria-modal="true" aria-label="Replace data">
             <div class="grab"></div>
             <h2>Replace all data?</h2>
-            <p class="hint">Importing a backup overwrites your current exercises and sets on this phone.</p>
+            <p class="hint">Importing a backup overwrites the exercises and sets in this account.</p>
             <div class="sheet-actions">
-              <button class="btn ghost" data-action="close-modal">Cancel</button>
-              <button class="btn primary" data-action="do-import">Import</button>
+              <button class="btn ghost" data-action="close-modal" ${busy}>Cancel</button>
+              <button class="btn primary" data-action="do-import" ${busy}>${modal.busy ? "Importing…" : "Import"}</button>
+            </div>
+          </div>
+        </div>`;
+      }
+      if (modal.type === "migrate-local") {
+        const data = modal.data || { exercises: [], sets: [] };
+        const setCount = data.sets.length;
+        const exCount = data.exercises.length;
+        const busy = modal.busy ? "disabled" : "";
+        const detail = `${setCount} set${setCount === 1 ? "" : "s"} across ${exCount} exercise${exCount === 1 ? "" : "s"} on this phone.`;
+        const err = modal.error ? `<p class="form-error" role="alert">${escapeHtml(modal.error)}</p>` : "";
+        return `<div class="overlay">
+          <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="migrate-title">
+            <div class="grab"></div>
+            <h2 id="migrate-title">Import your saved logs into this account</h2>
+            <p class="hint">${escapeHtml(detail)} They'll be added to ${escapeHtml(signedInEmail() || "this account")}.</p>
+            ${err}
+            <div class="sheet-actions">
+              <button class="btn ghost" data-action="migrate-dismiss" ${busy}>Not now</button>
+              <button class="btn primary" data-action="migrate-import" ${busy}>${modal.busy ? "Importing…" : "Import"}</button>
             </div>
           </div>
         </div>`;
@@ -1048,7 +1703,14 @@
       if (w) draft.weight = w.value;
       if (r) draft.reps = r.value;
     }
-
+    function readAuthInputs() {
+      const email = document.getElementById("auth-email");
+      const password = document.getElementById("auth-password");
+      const password2 = document.getElementById("auth-password2");
+      if (email) authForm.email = email.value;
+      if (password) authForm.password = password.value;
+      if (password2) authForm.password2 = password2.value;
+    }
     function parseWeight(str) {
       const n = parseFloat(String(str).replace(",", "."));
       if (!Number.isFinite(n) || n < 0) return null;
@@ -1058,6 +1720,16 @@
       const n = parseInt(String(str), 10);
       if (!Number.isFinite(n) || n < 1) return null;
       return n;
+    }
+    function validateAuth(mode) {
+      const email = authForm.email.trim();
+      if (mode !== "recovery") {
+        if (!email || email.indexOf("@") === -1) return "Enter a valid email.";
+      }
+      if (mode === "forgot") return "";
+      if (!authForm.password || authForm.password.length < 6) return "Use at least 6 characters.";
+      if ((mode === "signup" || mode === "recovery") && authForm.password !== authForm.password2) return "Passwords don't match.";
+      return "";
     }
 
     function bind() {
@@ -1071,7 +1743,7 @@
       const overlay = document.querySelector(".overlay");
       if (overlay) {
         overlay.addEventListener("click", (e) => {
-          if (e.target === overlay) closeModal();
+          if (e.target === overlay && (!modal || modal.type !== "migrate-local")) closeModal();
         });
         const sheet = overlay.querySelector(".sheet");
         if (sheet) sheet.addEventListener("click", (e) => e.stopPropagation());
@@ -1097,6 +1769,26 @@
       const dr = document.getElementById("draft-reps");
       if (dw) dw.addEventListener("input", () => { draft.weight = dw.value; });
       if (dr) dr.addEventListener("input", () => { draft.reps = dr.value; });
+
+      const authFormEl = document.getElementById("auth-form");
+      if (authFormEl) authFormEl.addEventListener("submit", (e) => {
+        e.preventDefault();
+        submitAuth();
+      });
+      const recoveryFormEl = document.getElementById("recovery-form");
+      if (recoveryFormEl) recoveryFormEl.addEventListener("submit", (e) => {
+        e.preventDefault();
+        submitNewPassword();
+      });
+      ["auth-email", "auth-password", "auth-password2"].forEach(id => {
+        const input = document.getElementById(id);
+        if (!input) return;
+        input.addEventListener("input", () => {
+          if (id === "auth-email") authForm.email = input.value;
+          if (id === "auth-password") authForm.password = input.value;
+          if (id === "auth-password2") authForm.password2 = input.value;
+        });
+      });
     }
 
     function closeModal() {
@@ -1104,8 +1796,41 @@
       render();
     }
 
-    function handleAction(action, el) {
+    async function handleAction(action, el) {
       if (action === "close-modal") return closeModal();
+      if (action === "auth-mode") {
+        authMode = el.getAttribute("data-mode") || "login";
+        authError = "";
+        authNotice = "";
+        authForm.password = "";
+        authForm.password2 = "";
+        focusAuthField = "auth-email";
+        render();
+        return;
+      }
+      if (action === "retry-load") {
+        dataReadyFor = null;
+        bootError = "";
+        loadAccount();
+        return;
+      }
+      if (action === "log-out") {
+        authForm.password = "";
+        authForm.password2 = "";
+        try {
+          await sb.auth.signOut();
+        } catch (err) {
+          showToast(err.message || "Couldn't log out.");
+        }
+        return;
+      }
+      if (action === "migrate-dismiss") {
+        localStorage.setItem(migrationFlag(), "dismissed");
+        modal = null;
+        render();
+        return;
+      }
+      if (action === "migrate-import") return migrateImport();
       if (action === "add-exercise") {
         modal = { type: "add-exercise", value: "" };
         return render();
@@ -1115,7 +1840,7 @@
         return render();
       }
       if (action === "rename-exercise") {
-        const ex = exerciseById(modal && modal.id || route.id);
+        const ex = exerciseById((modal && modal.id) || route.id);
         modal = { type: "rename-exercise", id: ex && ex.id, value: ex ? ex.name : "" };
         return render();
       }
@@ -1123,16 +1848,7 @@
         modal = { type: "confirm-delete-ex", id: (modal && modal.id) || route.id };
         return render();
       }
-      if (action === "delete-exercise") {
-        const id = modal.id;
-        state.exercises = state.exercises.filter(e => e.id !== id);
-        state.sets = state.sets.filter(s => s.exerciseId !== id);
-        save();
-        modal = null;
-        showToast("Exercise deleted");
-        go("#/");
-        return;
-      }
+      if (action === "delete-exercise") return deleteExercise();
       if (action === "save-exercise-name") return saveExerciseName();
       if (action === "step-w") {
         readDraftInputs();
@@ -1158,122 +1874,254 @@
         return render();
       }
       if (action === "save-set") return saveSetEdit();
-      if (action === "delete-set") {
-        const id = el.getAttribute("data-id");
-        state.sets = state.sets.filter(s => s.id !== id);
-        save();
-        showToast("Set deleted");
-        return;
-      }
-      if (action === "set-unit") {
-        const next = el.getAttribute("data-unit");
-        if (next === state.settings.unit) return;
-        state.settings.unit = next;
-        draftExId = null;
-        save();
-        showToast("Unit set to " + next);
-        return;
-      }
+      if (action === "delete-set") return deleteSet(el.getAttribute("data-id"));
+      if (action === "set-unit") return setUnit(el.getAttribute("data-unit"));
       if (action === "export-json") return exportJson();
-      if (action === "import-json") {
-        const input = document.getElementById("import-file");
-        if (!input) return;
-        input.value = "";
-        input.onchange = () => {
-          const file = input.files && input.files[0];
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = () => {
-            try {
-              const data = JSON.parse(reader.result);
-              if (!data || !Array.isArray(data.exercises) || !Array.isArray(data.sets)) {
-                showToast("That file isn’t a valid Lift Log backup");
-                return;
-              }
-              modal = { type: "confirm-import", data };
-              render();
-            } catch {
-              showToast("Couldn’t read that JSON file");
-            }
-          };
-          reader.readAsText(file);
-        };
-        input.click();
+      if (action === "import-json") return chooseImportFile();
+      if (action === "do-import") return doImport();
+    }
+
+    async function submitAuth() {
+      if (authBusy) return;
+      readAuthInputs();
+      const mode = authMode === "signup" || authMode === "forgot" ? authMode : "login";
+      const problem = validateAuth(mode);
+      authError = "";
+      authNotice = "";
+      if (problem) {
+        authError = problem;
+        render();
         return;
       }
-      if (action === "do-import") {
-        const data = modal.data;
-        state = {
-          version: 1,
-          settings: { unit: (data.settings && data.settings.unit) === "kg" ? "kg" : "lbs" },
-          exercises: data.exercises,
-          sets: data.sets
-        };
-        draftExId = null;
-        save();
-        modal = null;
-        showToast("Backup imported");
-        return;
+      authBusy = true;
+      render();
+      try {
+        if (mode === "forgot") {
+          const { error } = await sb.auth.resetPasswordForEmail(authForm.email.trim(), {
+            redirectTo: currentPageUrl()
+          });
+          if (error) throw error;
+          authNotice = "Check your email for a link to reset your password.";
+          return;
+        }
+        if (mode === "signup") {
+          const { data, error } = await sb.auth.signUp({
+            email: authForm.email.trim(),
+            password: authForm.password,
+            options: { emailRedirectTo: currentPageUrl() }
+          });
+          if (error) throw error;
+          if (!data.session) {
+            authMode = "login";
+            authForm.password = "";
+            authForm.password2 = "";
+            authNotice = "Check your email to confirm your account, then log in.";
+          }
+          return;
+        }
+        const { error } = await sb.auth.signInWithPassword({
+          email: authForm.email.trim(),
+          password: authForm.password
+        });
+        if (error) throw error;
+        authForm.password = "";
+      } catch (err) {
+        authError = err.message || "Something went wrong.";
+      } finally {
+        authBusy = false;
+        render();
       }
     }
 
-    function saveExerciseName() {
+    async function submitNewPassword() {
+      if (authBusy) return;
+      readAuthInputs();
+      const problem = validateAuth("recovery");
+      if (problem) {
+        authError = problem;
+        render();
+        return;
+      }
+      authBusy = true;
+      authError = "";
+      render();
+      try {
+        const { error } = await sb.auth.updateUser({ password: authForm.password });
+        if (error) throw error;
+        recoveryMode = false;
+        authForm.password = "";
+        authForm.password2 = "";
+        authBusy = false;
+        if (!dataReadyFor && session) await loadAccount();
+        else render();
+        showToast("Password updated");
+      } catch (err) {
+        authError = err.message || "Couldn't update that password.";
+        authBusy = false;
+        render();
+      }
+    }
+
+    async function saveExerciseName() {
+      if (saving) return;
       const input = document.getElementById("modal-name");
       const name = (input ? input.value : (modal && modal.value) || "").trim();
       if (!name) { showToast("Give the exercise a name"); return; }
       const exists = state.exercises.some(e => e.name.toLowerCase() === name.toLowerCase() && e.id !== (modal && modal.id));
       if (exists) { showToast("That exercise already exists"); return; }
-      if (modal.type === "add-exercise") {
-        const ex = { id: uid(), name, custom: true, createdAt: Date.now() };
-        state.exercises.push(ex);
-        save();
+      saving = true;
+      try {
+        if (modal.type === "add-exercise") {
+          const ex = { id: uid(), name, custom: true, createdAt: Date.now() };
+          await persistExerciseInsert(ex);
+          state.exercises.push(ex);
+          modal = null;
+          saving = false;
+          showToast("Exercise added");
+          go("#/exercise/" + encodeURIComponent(ex.id));
+          return;
+        }
+        const ex = exerciseById(modal.id);
+        if (!ex) { modal = null; render(); return; }
+        const prev = ex.name;
+        ex.name = name;
+        try {
+          await persistExerciseName(ex.id, name);
+        } catch (err) {
+          ex.name = prev;
+          throw err;
+        }
         modal = null;
-        showToast("Exercise added");
-        go("#/exercise/" + encodeURIComponent(ex.id));
-        return;
+        saving = false;
+        showToast("Renamed");
+      } catch (err) {
+        const duplicate = err.code === "23505";
+        showToast(duplicate ? "That exercise already exists" : (err.message || "Couldn't save that exercise."));
+      } finally {
+        saving = false;
       }
-      const ex = exerciseById(modal.id);
-      if (ex) { ex.name = name; save(); }
-      modal = null;
-      showToast("Renamed");
-      render();
     }
 
-    function addSet() {
+    async function deleteExercise() {
+      if (saving || !modal) return;
+      const id = modal.id;
+      const exBackup = state.exercises.slice();
+      const setBackup = state.sets.slice();
+      saving = true;
+      state.exercises = state.exercises.filter(e => e.id !== id);
+      state.sets = state.sets.filter(s => s.exerciseId !== id);
+      try {
+        await persistExerciseDelete(id);
+        modal = null;
+        saving = false;
+        showToast("Exercise deleted");
+        go("#/");
+      } catch (err) {
+        state.exercises = exBackup;
+        state.sets = setBackup;
+        showToast(err.message || "Couldn't delete that exercise.");
+      } finally {
+        saving = false;
+      }
+    }
+
+    async function addSet() {
+      if (saving) return;
       readDraftInputs();
       const w = parseWeight(draft.weight);
       const r = parseReps(draft.reps);
       if (w == null) { showToast("Enter a valid weight"); return; }
       if (r == null) { showToast("Enter at least 1 rep"); return; }
-      state.sets.push({
+      const row = {
         id: uid(),
         exerciseId: route.id,
         weightLbs: toLbs(w),
         reps: r,
         createdAt: Date.now()
-      });
+      };
+      saving = true;
+      state.sets.push(row);
       draft = { weight: String(w), reps: String(r) };
       draftExId = route.id;
-      save();
-      showToast("Set logged");
+      try {
+        await persistSetInsert(row, w);
+        saving = false;
+        showToast("Set logged");
+      } catch (err) {
+        state.sets = state.sets.filter(s => s.id !== row.id);
+        showToast(err.message || "Couldn't log that set.");
+      } finally {
+        saving = false;
+      }
     }
 
-    function saveSetEdit() {
+    async function saveSetEdit() {
+      if (saving) return;
       const s = state.sets.find(x => x.id === modal.id);
       if (!s) return closeModal();
       const w = parseWeight(document.getElementById("edit-weight").value);
       const r = parseReps(document.getElementById("edit-reps").value);
       if (w == null) { showToast("Enter a valid weight"); return; }
       if (r == null) { showToast("Enter at least 1 rep"); return; }
+      const prevW = s.weightLbs;
+      const prevR = s.reps;
       s.weightLbs = toLbs(w);
       s.reps = r;
-      save();
-      modal = null;
-      showToast("Set updated");
+      saving = true;
+      try {
+        await persistSetUpdate(s.id, w, r);
+        modal = null;
+        saving = false;
+        showToast("Set updated");
+      } catch (err) {
+        s.weightLbs = prevW;
+        s.reps = prevR;
+        showToast(err.message || "Couldn't update that set.");
+      } finally {
+        saving = false;
+      }
+    }
+
+    async function deleteSet(id) {
+      if (saving) return;
+      const backup = state.sets.slice();
+      state.sets = state.sets.filter(s => s.id !== id);
+      saving = true;
+      try {
+        await persistSetDelete(id);
+        saving = false;
+        showToast("Set deleted");
+      } catch (err) {
+        state.sets = backup;
+        showToast(err.message || "Couldn't delete that set.");
+      } finally {
+        saving = false;
+      }
+    }
+
+    async function setUnit(next) {
+      if (next === state.settings.unit) return;
+      if (next !== "lbs" && next !== "kg") return;
+      const prev = state.settings.unit;
+      state.settings.unit = next;
+      draftExId = null;
+      try {
+        await persistUnit(next);
+        showToast("Unit set to " + next);
+      } catch (err) {
+        state.settings.unit = prev;
+        showToast(err.message || "Couldn't update units.");
+      }
     }
 
     function exportJson() {
-      const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+      const payload = {
+        version: 2,
+        settings: { unit: state.settings.unit },
+        exercises: state.exercises,
+        sets: state.sets
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
       const a = document.createElement("a");
       const day = todayKey(Date.now());
       a.href = URL.createObjectURL(blob);
@@ -1284,12 +2132,97 @@
       showToast("Backup downloaded");
     }
 
+    function chooseImportFile() {
+      const input = document.getElementById("import-file");
+      if (!input) return;
+      input.value = "";
+      input.onchange = () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const data = JSON.parse(reader.result);
+            if (!data || !Array.isArray(data.exercises) || !Array.isArray(data.sets)) {
+              showToast("That file isn’t a valid Lift Log backup");
+              return;
+            }
+            modal = { type: "confirm-import", data };
+            render();
+          } catch {
+            showToast("Couldn’t read that JSON file");
+          }
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    }
+
+    async function doImport() {
+      if (!modal || modal.type !== "confirm-import" || modal.busy) return;
+      const data = modal.data;
+      modal = { type: "confirm-import", data, busy: true };
+      render();
+      try {
+        await replaceWithBackup(data);
+        modal = null;
+        draftExId = null;
+        dataReadyFor = null;
+        await loadAccount();
+        showToast("Backup imported");
+      } catch (err) {
+        modal = null;
+        dataReadyFor = null;
+        showToast(err.message || "Couldn't import that backup.");
+        await loadAccount();
+      }
+    }
+
+    async function migrateImport() {
+      if (!modal || modal.type !== "migrate-local" || modal.busy) return;
+      const data = modal.data;
+      modal = { type: "migrate-local", data, busy: true };
+      render();
+      try {
+        await mergeLegacy(data);
+        localStorage.setItem(migrationFlag(), new Date().toISOString());
+        modal = null;
+        dataReadyFor = null;
+        await loadAccount();
+        showToast("Saved logs imported");
+      } catch (err) {
+        modal = { type: "migrate-local", data, error: err.message || "Couldn't import those logs." };
+        render();
+      }
+    }
+
     window.addEventListener("hashchange", () => {
+      if (isAuthHash(location.hash)) return;
       route = parseHash();
       if (route.name !== "exercise") draftExId = null;
-      modal = null;
+      if (!modal || modal.type !== "migrate-local") modal = null;
       render();
     });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && modal && modal.type !== "migrate-local" && !modal.busy) closeModal();
+    });
+
+    sb.auth.onAuthStateChange((event, sess) => onAuth(event, sess));
+
+    setTimeout(() => {
+      if (authResolved) return;
+      sb.auth.getSession().then(({ data }) => {
+        if (authResolved) return;
+        bootFromSession(data && data.session ? "SIGNED_IN" : "INITIAL_SESSION", (data && data.session) || null);
+      }).catch(() => {
+        if (authResolved) return;
+        authResolved = true;
+        loading = false;
+        authError = authError || "Couldn't check your session.";
+        render();
+      });
+    }, 2500);
 
     render();
   })();
