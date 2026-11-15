@@ -722,6 +722,32 @@
       line-height: 1.45;
     }
     .auth-links { display: flex; flex-direction: column; margin-top: 6px; }
+    .terms-check {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin: 4px 0 12px;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    .terms-check input {
+      width: 22px;
+      height: 22px;
+      margin-top: 1px;
+      flex-shrink: 0;
+      accent-color: var(--accent);
+    }
+    .terms-check button {
+      color: var(--accent-2);
+      font-weight: 750;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .terms-doc { padding-bottom: 24px; }
+    .terms-doc h2 { margin: 18px 0 6px; font-size: 16px; letter-spacing: -0.02em; }
+    .terms-doc p, .terms-doc li { color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .terms-doc ul { margin: 0; padding-left: 18px; }
+    .terms-doc .beta { color: var(--text); font-weight: 650; }
     .auth-link {
       min-height: 44px;
       padding: 10px 8px;
@@ -1525,6 +1551,8 @@
     let draft = { weight: "", reps: "" };
     let draftExId = null;
     let session = null;
+    const TERMS_VERSION = "2026-11-14";
+    let termsAgreed = false;
     let authMode = "login";
     let authForm = { email: "", password: "", password2: "" };
     let authError = readAuthHashError();
@@ -1669,6 +1697,7 @@
       if (isAuthHash(raw)) return { name: "home" };
       const h = raw.replace(/^#/, "") || "/";
       if (h === "/settings") return { name: "settings" };
+      if (h === "/terms") return { name: "terms" };
       if (h === "/admin") return { name: "admin" };
       if (h === "/workout") return { name: "workout" };
       if (h === "/history") return { name: "history" };
@@ -2273,6 +2302,7 @@
     function screenName() {
       if (recoveryMode) return "recovery";
       if (!authResolved || (session && loading)) return "loading";
+      if (route.name === "terms") return "terms";
       if (!session) return "auth";
       if (bootError) return "error";
       if (route.name === "settings") return "settings";
@@ -2299,6 +2329,7 @@
       if (screen === "recovery") html = renderRecovery();
       else if (screen === "loading") html = renderLoading();
       else if (screen === "auth") html = renderAuth();
+      else if (screen === "terms") html = renderTerms();
       else if (screen === "error") html = renderBootError();
       else if (screen === "settings") html = renderSettings();
       else if (screen === "admin") html = renderAdmin();
@@ -2390,6 +2421,50 @@
       </div></main>`;
     }
 
+    function termsArticle() {
+      return `<article class="terms-doc">
+        <p class="beta">Lift Log is a free beta. Expect bugs, and keep an export if you want a backup.</p>
+        <p>Effective date: November 14, 2026</p>
+        <p>Paul Kogut runs Lift Log as an individual developer. There is no company behind this app.</p>
+        <h2>Acceptance</h2>
+        <p>By creating an account, you agree to these terms. If you do not agree, do not sign up.</p>
+        <h2>The service</h2>
+        <p>Lift Log is a workout log. It is provided as-is, with no warranty. It can have bugs, and you can lose data.</p>
+        <h2>Not advice</h2>
+        <p>This is not medical or fitness advice. Talk with a doctor before you train. You lift at your own risk. The developer is not liable for injuries.</p>
+        <h2>Your responsibilities</h2>
+        <ul>
+          <li>Use an accurate email address.</li>
+          <li>Keep your password secure.</li>
+          <li>You must be 13 or older.</li>
+          <li>Do not abuse or misuse the app.</li>
+        </ul>
+        <h2>Your data</h2>
+        <p>Your account data is stored with Supabase. It is private to your account. It is never sold or shared. Delete account in Settings removes the account and all of your data.</p>
+        <h2>Intellectual property</h2>
+        <p>The Lift Log app, including its user interface, design, layout, code, and branding, is proprietary and owned by Paul Kogut. All rights reserved.</p>
+        <p>You get a limited, personal, non-transferable license to use the app. You may not copy, reproduce, modify, distribute, reverse engineer, or create derivative works from the user interface or the app without written permission.</p>
+        <p>You keep ownership of the workout data you enter.</p>
+        <h2>Changes and ending the service</h2>
+        <p>The service can change or end at any time. An account can be terminated for misuse.</p>
+        <h2>Limitation of liability</h2>
+        <p>To the fullest extent the law allows, the developer is not liable for damages from using Lift Log or from being unable to use it, including lost data or injuries.</p>
+        <h2>Changes to these terms</h2>
+        <p>These terms can change. The effective date at the top will be updated. If you keep using Lift Log after a change, you accept the new terms.</p>
+        <h2>Contact</h2>
+        <p>Questions go to the developer, Paul Kogut, at paulwkogut@gmail.com.</p>
+      </article>`;
+    }
+    function renderTerms() {
+      const back = session ? "#/settings" : "#/";
+      return `<header class="topbar">
+          <button class="icon-btn" data-go="${back}" aria-label="Back">${backIcon()}</button>
+          <h1>Terms of Service</h1>
+        </header>
+        <main class="screen">
+          ${termsArticle()}
+        </main>`;
+    }
     function renderAuth() {
       const mode = authMode === "signup" || authMode === "forgot" ? authMode : "login";
       const title = mode === "signup" ? "Create your account" : mode === "forgot" ? "Reset password" : "Welcome back";
@@ -2410,7 +2485,11 @@
         <label class="field-lbl" for="auth-password">Password</label>
         <input class="text-input" id="auth-password" name="password" type="password" autocomplete="${passwordAuto}" aria-label="Password">
         ${mode === "signup" ? `<label class="field-lbl" for="auth-password2">Confirm password</label>
-        <input class="text-input" id="auth-password2" name="password2" type="password" autocomplete="new-password" aria-label="Confirm password">` : ""}`;
+        <input class="text-input" id="auth-password2" name="password2" type="password" autocomplete="new-password" aria-label="Confirm password">
+        <div class="terms-check">
+          <input type="checkbox" id="terms-agree" ${termsAgreed ? "checked" : ""} aria-label="I agree to the Terms of Service">
+          <span><label for="terms-agree">I agree to the</label> <button type="button" data-go="#/terms">Terms of Service</button></span>
+        </div>` : ""}`;
       const links = mode === "login"
         ? `<button type="button" class="auth-link" data-action="auth-mode" data-mode="forgot">Forgot password?</button>
            <button type="button" class="auth-link" data-action="auth-mode" data-mode="signup">Need an account? Sign up</button>`
@@ -2425,7 +2504,7 @@
           <label class="field-lbl" for="auth-email">Email</label>
           <input class="text-input" id="auth-email" name="email" type="email" inputmode="email" autocomplete="username" aria-label="Email">
           ${passwords}
-          <button class="add-set" type="submit" ${authBusy ? "disabled" : ""}>${authBusy ? busyLabel : submit}</button>
+          <button class="add-set" type="submit" ${(authBusy || (mode === "signup" && !termsAgreed)) ? "disabled" : ""}>${authBusy ? busyLabel : submit}</button>
         </form>
         <div class="auth-links">${links}</div>
         ${mode === "forgot" ? "" : `<p class="privacy-note">Your workouts are saved privately to your account so they sync across devices. Other users can't see your data. We never sell or share it, and you can delete your account and all your data anytime in Settings.</p>`}
@@ -3376,6 +3455,12 @@
                 <div class="d">A short walkthrough you can replay</div>
               </div>
             </button>
+            <button class="settings-row tappable" data-go="#/terms">
+              <div>
+                <div class="k">Terms of Service</div>
+                <div class="d">The rules for using Lift Log</div>
+              </div>
+            </button>
           </div>
           <div class="faq">
             <h3>Why doesn't my iPhone vibrate?</h3>
@@ -3675,6 +3760,7 @@
         if (!email || email.indexOf("@") === -1) return "Enter a valid email.";
       }
       if (mode === "forgot") return "";
+      if (mode === "signup" && !termsAgreed) return "Agree to the Terms of Service.";
       if (!authForm.password || authForm.password.length < 6) return "Use at least 6 characters.";
       if ((mode === "signup" || mode === "recovery") && authForm.password !== authForm.password2) return "Passwords don't match.";
       return "";
@@ -3740,6 +3826,12 @@
         confirmPw.value = passwordDraft.confirm;
         confirmPw.addEventListener("input", () => { passwordDraft.confirm = confirmPw.value; });
       }
+      const agree = document.getElementById("terms-agree");
+      if (agree) agree.addEventListener("change", () => {
+        termsAgreed = agree.checked;
+        const submit = document.querySelector("#auth-form button[type='submit']");
+        if (submit) submit.disabled = !termsAgreed || authBusy;
+      });
       const restMsg = document.getElementById("rest-message");
       if (restMsg) {
         restMsg.addEventListener("input", () => {
@@ -4067,7 +4159,13 @@
           const { data, error } = await sb.auth.signUp({
             email: authForm.email.trim(),
             password: authForm.password,
-            options: { emailRedirectTo: currentPageUrl() }
+            options: {
+              emailRedirectTo: currentPageUrl(),
+              data: {
+                terms_accepted_at: new Date().toISOString(),
+                terms_version: TERMS_VERSION
+              }
+            }
           });
           if (error) throw error;
           if (!data.session) {
