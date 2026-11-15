@@ -631,6 +631,11 @@
       text-transform: uppercase;
       margin-bottom: 6px;
     }
+    textarea.text-input { min-height: 140px; resize: vertical; }
+    .feedback-cats { width: 100%; margin-bottom: 14px; }
+    .feedback-cats button { flex: 1; }
+    .feedback-card { margin-bottom: 8px; }
+    .feedback-card p { margin: 8px 0 0; white-space: pre-wrap; }
     .text-input, .num-input {
       width: 100%;
       background: var(--surface);
@@ -1629,6 +1634,13 @@
     let adminStats;
     let adminStatsBusy = false;
     let adminStatsToken = 0;
+    let feedbackCategory = "bug";
+    let feedbackDraft = "";
+    let feedbackContact = false;
+    let feedbackError = "";
+    let feedbackBusy = false;
+    let adminFeedback;
+    let adminFeedbackError = "";
     let libEquip = "All";
     let libMuscle = "All";
 
@@ -1699,6 +1711,8 @@
       if (h === "/settings") return { name: "settings" };
       if (h === "/terms") return { name: "terms" };
       if (h === "/admin") return { name: "admin" };
+      if (h === "/feedback") return { name: "feedback" };
+      if (h === "/admin-feedback") return { name: "admin-feedback" };
       if (h === "/workout") return { name: "workout" };
       if (h === "/history") return { name: "history" };
       const hist = h.match(/^\/history\/(\d{4}-\d{2}-\d{2})$/);
@@ -2307,6 +2321,8 @@
       if (bootError) return "error";
       if (route.name === "settings") return "settings";
       if (route.name === "admin") return "admin";
+      if (route.name === "feedback") return "feedback";
+      if (route.name === "admin-feedback") return "admin-feedback";
       if (route.name === "exercise") return "exercise";
       if (route.name === "workout") return "workout";
       if (route.name === "history") return "history";
@@ -2323,7 +2339,8 @@
       const activePos = active && typeof active.selectionStart === "number" ? [active.selectionStart, active.selectionEnd] : null;
       const screen = screenName();
       appEl.dataset.screen = screen;
-      if (screen === "settings" || screen === "admin") ensureAdminStats();
+      if (screen === "settings" || screen === "admin" || screen === "admin-feedback") ensureAdminStats();
+      if (screen === "admin-feedback") loadAdminFeedback();
 
       let html = "";
       if (screen === "recovery") html = renderRecovery();
@@ -2333,6 +2350,8 @@
       else if (screen === "error") html = renderBootError();
       else if (screen === "settings") html = renderSettings();
       else if (screen === "admin") html = renderAdmin();
+      else if (screen === "feedback") html = renderFeedback();
+      else if (screen === "admin-feedback") html = renderAdminFeedback();
       else if (screen === "exercise") html = renderExercise();
       else if (screen === "workout") html = renderWorkout();
       else if (screen === "history") html = renderHistory();
@@ -3106,7 +3125,7 @@
           }
           adminStats = data && typeof data === "object" ? data : null;
         }
-        if (route.name === "settings" || route.name === "admin") render();
+        if (route.name === "settings" || route.name === "admin" || route.name === "admin-feedback") render();
       }).catch(() => {
         if (token !== adminStatsToken) return;
         adminStatsBusy = false;
@@ -3261,6 +3280,128 @@
           <p class="hint">Days follow the database clock. A lifter is someone who logged a set.</p>
         </main>`;
     }
+    function feedbackLabel(category) {
+      if (category === "idea") return "Idea";
+      if (category === "other") return "Other";
+      return "Bug";
+    }
+    function loadAdminFeedback() {
+      if (!adminStats || adminFeedback !== undefined || !session) return;
+      adminFeedback = null;
+      sb.from("feedback").select("id,category,message,contact_ok,user_email,created_at").order("created_at", { ascending: false }).limit(50).then(res => {
+        if (res.error) {
+          adminFeedback = [];
+          adminFeedbackError = "Feedback isn't available yet.";
+        } else {
+          adminFeedback = res.data || [];
+          adminFeedbackError = "";
+        }
+        if (route.name === "admin-feedback") render();
+      }).catch(() => {
+        adminFeedback = [];
+        adminFeedbackError = "Feedback isn't available yet.";
+        if (route.name === "admin-feedback") render();
+      });
+    }
+    function renderFeedback() {
+      const cats = [["bug", "Bug"], ["idea", "Idea"], ["other", "Other"]];
+      return `<header class="topbar">
+          <button class="icon-btn" data-go="#/settings" aria-label="Back">${backIcon()}</button>
+          <h1>Send feedback</h1>
+        </header>
+        <main class="screen">
+          <div class="eyebrow">Category</div>
+          <div class="seg feedback-cats" role="group" aria-label="Feedback category">
+            ${cats.map(([id, label]) => `<button type="button" data-action="feedback-cat" data-value="${id}" class="${feedbackCategory === id ? "on" : ""}">${label}</button>`).join("")}
+          </div>
+          <label class="field-lbl" for="feedback-message">Message</label>
+          <textarea id="feedback-message" class="text-input" maxlength="2000" placeholder="What should Paul know?" ${demoMode ? "disabled" : ""}>${escapeHtml(feedbackDraft)}</textarea>
+          <label class="terms-check">
+            <input type="checkbox" id="feedback-contact" ${feedbackContact ? "checked" : ""} ${demoMode ? "disabled" : ""}>
+            <span><label for="feedback-contact">OK to contact me back</label></span>
+          </label>
+          ${feedbackError ? `<p class="form-error" role="alert">${escapeHtml(feedbackError)}</p>` : ""}
+          <button type="button" class="add-set" data-action="feedback-send" ${(feedbackBusy || demoMode) ? "disabled" : ""}>${feedbackBusy ? "Sending…" : "Send"}</button>
+          ${demoMode ? `<p class="hint">Exit demo before sending feedback.</p>` : `<p class="hint">2000 characters max.</p>`}
+        </main>`;
+    }
+    function renderAdminFeedback() {
+      if (!adminStats) {
+        return `<header class="topbar">
+          <button class="icon-btn" data-go="#/settings" aria-label="Back">${backIcon()}</button>
+          <h1>Feedback</h1>
+        </header>
+        <main class="screen"><div class="empty">Nothing here.</div></main>`;
+      }
+      const rows = (adminFeedback || []).map(item => {
+        const when = item.created_at ? new Date(item.created_at).toLocaleString() : "";
+        const who = item.contact_ok && item.user_email ? item.user_email : "No reply requested";
+        return `<article class="pr-card feedback-card">
+          <div class="lbl">${escapeHtml(feedbackLabel(item.category))}</div>
+          <div class="sub">${escapeHtml(when)} · ${escapeHtml(who)}</div>
+          <p>${escapeHtml(item.message || "")}</p>
+        </article>`;
+      }).join("");
+      return `<header class="topbar">
+          <button class="icon-btn" data-go="#/settings" aria-label="Back">${backIcon()}</button>
+          <h1>Feedback</h1>
+        </header>
+        <main class="screen">
+          ${adminFeedback === undefined || adminFeedback === null ? `<div class="empty">Loading…</div>` : rows || `<div class="empty">${escapeHtml(adminFeedbackError || "No feedback yet.")}</div>`}
+        </main>`;
+    }
+    async function sendFeedback() {
+      if (demoMode) {
+        feedbackError = "Exit demo before sending feedback.";
+        render();
+        return;
+      }
+      const box = document.getElementById("feedback-message");
+      if (box) feedbackDraft = box.value.slice(0, 2000);
+      const contact = document.getElementById("feedback-contact");
+      if (contact) feedbackContact = contact.checked;
+      const message = feedbackDraft.trim();
+      if (!message) {
+        feedbackError = "Write a message.";
+        render();
+        return;
+      }
+      feedbackBusy = true;
+      feedbackError = "";
+      render();
+      try {
+        const { data } = await sb.auth.getSession();
+        const token = data && data.session && data.session.access_token;
+        if (!token) throw new Error("Not signed in.");
+        const res = await fetch(SUPABASE_URL + "/functions/v1/send-feedback", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + token,
+            apikey: SUPABASE_PUBLISHABLE_KEY,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            category: feedbackCategory,
+            message,
+            contactOk: feedbackContact
+          })
+        });
+        let payload = null;
+        try { payload = await res.json(); } catch {}
+        if (res.status === 404) throw new Error("Feedback isn't set up yet.");
+        if (!res.ok || (payload && payload.ok === false)) throw new Error((payload && payload.error) || "Couldn't send that.");
+        feedbackDraft = "";
+        feedbackContact = false;
+        feedbackBusy = false;
+        feedbackError = "";
+        go("#/settings");
+        showToast("Thanks, your feedback was sent.");
+      } catch (err) {
+        feedbackBusy = false;
+        feedbackError = err.message || "Couldn't send that.";
+        render();
+      }
+    }
     function renderSettings() {
       const u = unit();
       const count = state.sets.length;
@@ -3310,6 +3451,13 @@
                 <div class="d">Sample workouts for the last 8 weeks. Nothing is saved.</div>
               </div>
             </button>`}
+            <button type="button" class="settings-row tappable" data-go="#/admin-feedback">
+              <div>
+                <div class="k">Feedback</div>
+                <div class="d">Messages people sent from the app</div>
+              </div>
+              <span class="chev">${chevron()}</span>
+            </button>
           </div>` : ""}
           <div class="eyebrow">Units</div>
           <div class="settings-card">
@@ -3441,6 +3589,16 @@
           </div>
           <input id="import-file" type="file" accept="application/json,.json" hidden>
           <p class="hint">Your sets are saved to this account. Export a backup anytime.</p>
+          <div class="eyebrow">Feedback</div>
+          <div class="settings-card">
+            <button type="button" class="settings-row tappable" data-go="#/feedback" ${demoMode ? "disabled" : ""}>
+              <div>
+                <div class="k">Send feedback</div>
+                <div class="d">${demoMode ? "Exit demo to send feedback." : "A bug, an idea, or anything else."}</div>
+              </div>
+              <span class="chev">${chevron()}</span>
+            </button>
+          </div>
           <div class="eyebrow">Help</div>
           <div class="settings-card">
             <button class="settings-row tappable" data-action="share-app">
@@ -3826,6 +3984,14 @@
         confirmPw.value = passwordDraft.confirm;
         confirmPw.addEventListener("input", () => { passwordDraft.confirm = confirmPw.value; });
       }
+      const feedbackBox = document.getElementById("feedback-message");
+      if (feedbackBox) feedbackBox.addEventListener("input", () => {
+        feedbackDraft = feedbackBox.value.slice(0, 2000);
+      });
+      const feedbackContactBox = document.getElementById("feedback-contact");
+      if (feedbackContactBox) feedbackContactBox.addEventListener("change", () => {
+        feedbackContact = feedbackContactBox.checked;
+      });
       const agree = document.getElementById("terms-agree");
       if (agree) agree.addEventListener("change", () => {
         termsAgreed = agree.checked;
@@ -3967,6 +4133,17 @@
         return;
       }
       if (action === "open-demo") return enterDemo();
+      if (action === "feedback-cat") {
+        const box = document.getElementById("feedback-message");
+        if (box) feedbackDraft = box.value.slice(0, 2000);
+        const contact = document.getElementById("feedback-contact");
+        if (contact) feedbackContact = contact.checked;
+        const next = el.getAttribute("data-value");
+        if (next === "bug" || next === "idea" || next === "other") feedbackCategory = next;
+        render();
+        return;
+      }
+      if (action === "feedback-send") return sendFeedback();
       if (action === "exit-demo") return exitDemo();
       if (action === "change-password") return changePassword();
       if (action === "log-out") {
