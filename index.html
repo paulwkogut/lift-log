@@ -531,6 +531,30 @@
       font-size: 14px;
       text-align: left;
     }
+    .demo-banner {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: calc(8px + var(--safe-t)) 12px 8px;
+      background: var(--accent);
+      color: var(--accent-ink);
+      font-size: 13px;
+      font-weight: 750;
+    }
+    .demo-banner button {
+      background: var(--bg);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-weight: 750;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+    body.demo .topbar { top: calc(44px + var(--safe-t)); }
     .settings-row:active.tappable { background: var(--surface-2); }
 
     .seg {
@@ -1563,6 +1587,8 @@
     let historyCursor = null;
     let historyFocus = "";
     let historyDidSwipe = false;
+    let demoMode = false;
+    let demoBackup = null;
     let adminStats;
     let adminStatsBusy = false;
     let adminStatsToken = 0;
@@ -1893,6 +1919,7 @@
     }
 
     async function doLoad() {
+      if (demoMode) return;
       const seq = ++loadSeq;
       const uid = session && session.user && session.user.id;
       if (!uid) return;
@@ -1934,6 +1961,7 @@
     }
 
     async function persistExerciseInsert(ex) {
+      if (demoMode) return;
       const res = await sb.from("exercises").insert({
         id: ex.id,
         user_id: session.user.id,
@@ -1945,16 +1973,19 @@
     }
 
     async function persistExerciseName(id, name) {
+      if (demoMode) return;
       const res = await sb.from("exercises").update({ name }).eq("id", id);
       if (res.error) throw asError(res.error, "Couldn't rename that exercise.");
     }
 
     async function persistExerciseDelete(id) {
+      if (demoMode) return;
       const res = await sb.from("exercises").delete().eq("id", id);
       if (res.error) throw asError(res.error, "Couldn't delete that exercise.");
     }
 
     async function persistSetInsert(row, displayWeight) {
+      if (demoMode) return;
       const res = await sb.from("sets").insert({
         id: row.id,
         user_id: session.user.id,
@@ -1968,6 +1999,7 @@
     }
 
     async function persistSetUpdate(id, displayWeight, reps) {
+      if (demoMode) return;
       const res = await sb.from("sets").update({
         weight: displayWeight,
         reps,
@@ -1977,11 +2009,13 @@
     }
 
     async function persistSetDelete(id) {
+      if (demoMode) return;
       const res = await sb.from("sets").delete().eq("id", id);
       if (res.error) throw asError(res.error, "Couldn't delete that set.");
     }
 
     async function persistUnit(next) {
+      if (demoMode) return;
       const res = await sb.from("user_settings").upsert({
         user_id: session.user.id,
         unit: next,
@@ -2272,6 +2306,11 @@
       if (tutorialOpen && session && screen !== "loading" && screen !== "auth") html += renderTutorial();
       if (toastMsg) html += `<div class="toast" role="status">${escapeHtml(toastMsg)}</div>`;
       if (session && restSession && screen !== "loading" && screen !== "auth" && screen !== "recovery") html += restSheetHtml();
+      if (demoMode) document.body.classList.add("demo");
+      else document.body.classList.remove("demo");
+      if (demoMode && screen !== "auth" && screen !== "loading" && screen !== "recovery") {
+        html = `<div class="demo-banner"><span>Demo mode, changes aren't saved</span><button type="button" data-action="exit-demo">Exit demo</button></div>` + html;
+      }
       appEl.innerHTML = html;
       hydrateAuthFields();
       bind();
@@ -3005,6 +3044,100 @@
         <text x="${w}" y="${h - 4}" fill="var(--muted)" font-size="10" text-anchor="end">${label(list[list.length - 1])}</text>
       </svg>`;
     }
+    function buildDemoData() {
+      const plans = [
+        { name: "Push", kind: "push", items: [["Bench Press", 135, 5, 5], ["Overhead Press", 75, 8, 5], ["Incline Dumbbell Press", 50, 8, 5], ["Lateral Raise", 15, 12, 2.5], ["Triceps Pushdown", 50, 10, 5]] },
+        { name: "Pull", kind: "pull", items: [["Pull-up", 0, 6, 0], ["Barbell Row", 115, 8, 5], ["Lat Pulldown", 100, 10, 5], ["Face Pull", 40, 12, 5], ["Barbell Curl", 55, 10, 2.5]] },
+        { name: "Legs", kind: "legs", items: [["Squat", 155, 5, 5], ["Romanian Deadlift", 135, 8, 5], ["Leg Press", 180, 10, 10], ["Leg Curl", 70, 10, 5], ["Calf Raise", 100, 12, 5]] }
+      ];
+      const names = [];
+      plans.forEach(plan => plan.items.forEach(item => { if (names.indexOf(item[0]) < 0) names.push(item[0]); }));
+      const monday = new Date();
+      monday.setHours(0, 0, 0, 0);
+      const dow = monday.getDay();
+      monday.setDate(monday.getDate() + (dow === 0 ? -6 : 1 - dow) - 7 * 7);
+      const createdAt = monday.getTime();
+      const idByName = {};
+      const exercises = names.map(name => {
+        const id = "demo-" + name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+        idByName[name] = id;
+        return { id, name, custom: false, createdAt };
+      });
+      const templates = plans.map((plan, i) => ({
+        id: "demo-" + plan.kind,
+        name: plan.name,
+        kind: plan.kind,
+        position: i,
+        exerciseNames: plan.items.map(item => item[0]),
+        targets: plan.items.map(item => ({ sets: 3, reps: item[2] }))
+      }));
+      const sets = [];
+      let n = 0;
+      for (let week = 0; week < 8; week++) {
+        plans.forEach((plan, pi) => {
+          const day = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + week * 7 + pi * 2, 18, 0, 0, 0);
+          if (day.getTime() > Date.now()) return;
+          plan.items.forEach((item, ei) => {
+            const bodyweight = item[1] === 0;
+            const weight = bodyweight ? 0 : item[1] + week * item[3];
+            const reps = bodyweight ? Math.min(12, item[2] + Math.floor(week / 2)) : item[2];
+            for (let set = 0; set < 3; set++) {
+              sets.push({
+                id: "demo-set-" + (n++),
+                exerciseId: idByName[item[0]],
+                weightLbs: weight,
+                reps,
+                createdAt: day.getTime() + (ei * 3 + set) * 60000
+              });
+            }
+          });
+        });
+      }
+      return { exercises, sets, templates };
+    }
+    function enterDemo() {
+      if (demoMode || !adminStats) return;
+      demoBackup = {
+        state: JSON.parse(JSON.stringify(state)),
+        activeWorkout: activeWorkout ? JSON.parse(JSON.stringify(activeWorkout)) : null,
+        templatesMode
+      };
+      demoMode = true;
+      restSession = null;
+      restAlerted = false;
+      clearInterval(restTick);
+      stopRestBeeps();
+      activeWorkout = null;
+      workoutDrafts = {};
+      planDrafts = {};
+      const sample = buildDemoData();
+      state = {
+        version: 2,
+        settings: { unit: state.settings && state.settings.unit === "kg" ? "kg" : "lbs" },
+        exercises: sample.exercises,
+        sets: sample.sets,
+        templates: sample.templates,
+        lastTemplateId: sample.templates[0].id
+      };
+      templatesMode = "local";
+      go("#/");
+    }
+    function exitDemo() {
+      if (!demoBackup) { demoMode = false; document.body.classList.remove("demo"); return; }
+      state = demoBackup.state;
+      activeWorkout = demoBackup.activeWorkout;
+      templatesMode = demoBackup.templatesMode;
+      workoutDrafts = {};
+      planDrafts = {};
+      demoBackup = null;
+      demoMode = false;
+      restSession = null;
+      restAlerted = false;
+      clearInterval(restTick);
+      stopRestBeeps();
+      restoreRestSession();
+      go("#/");
+    }
     function renderAdmin() {
       if (!adminStats) {
         return `<header class="topbar">
@@ -3073,6 +3206,12 @@
               </div>
               <span class="chev">${chevron()}</span>
             </button>
+            ${demoMode ? "" : `<button type="button" class="settings-row tappable" data-action="open-demo">
+              <div>
+                <div class="k">Open demo</div>
+                <div class="d">Sample workouts for the last 8 weeks. Nothing is saved.</div>
+              </div>
+            </button>`}
           </div>` : ""}
           <div class="eyebrow">Units</div>
           <div class="settings-card">
@@ -3706,7 +3845,10 @@
         loadAccount();
         return;
       }
+      if (action === "open-demo") return enterDemo();
+      if (action === "exit-demo") return exitDemo();
       if (action === "log-out") {
+        if (demoMode) exitDemo();
         authForm.password = "";
         authForm.password2 = "";
         try {
@@ -4132,6 +4274,10 @@
       try { releaseScreenLock(); } catch {}
     }
     async function deleteAccount() {
+      if (demoMode) {
+        showToast("Exit demo before deleting the account.");
+        return;
+      }
       if (!modal || modal.type !== "delete-account" || modal.busy) return;
       const typed = (document.getElementById("delete-confirm") || {}).value || modal.phrase || "";
       if (String(typed).trim() !== "DELETE") return;
@@ -4178,6 +4324,10 @@
     }
 
     function chooseImportFile() {
+      if (demoMode) {
+        showToast("Exit demo before importing.");
+        return;
+      }
       const input = document.getElementById("import-file");
       if (!input) return;
       input.value = "";
@@ -4204,6 +4354,10 @@
     }
 
     async function doImport() {
+      if (demoMode) {
+        showToast("Exit demo before importing.");
+        return;
+      }
       if (!modal || modal.type !== "confirm-import" || modal.busy) return;
       const data = modal.data;
       modal = { type: "confirm-import", data, busy: true };
@@ -4304,6 +4458,7 @@
       }
     }
     function cacheTemplates() {
+      if (demoMode) return;
       if (!session || !session.user) return;
       localStorage.setItem(templatesCacheKey(), JSON.stringify({
         seeded: true,
@@ -4373,10 +4528,12 @@
       }
     }
     function persistActive() {
+      if (demoMode) return;
       if (!activeWorkout) localStorage.removeItem(activeWorkoutKey());
       else localStorage.setItem(activeWorkoutKey(), JSON.stringify(activeWorkout));
     }
     async function loadTemplates() {
+      if (demoMode) return;
       try {
         let res = await sb.from("templates").select("id,name,kind,position,exercise_names,exercise_targets").order("position", { ascending: true });
         if (res.error && isMissingColumn(res.error)) {
@@ -4738,8 +4895,8 @@
       if (!activeWorkout) return go("#/");
       const finishedId = activeWorkout.templateId;
       state.lastTemplateId = finishedId;
-      localStorage.setItem(lastTemplateKey(), finishedId || "");
-      if (templatesMode === "remote" && finishedId && String(finishedId).indexOf("local-") !== 0) {
+      if (!demoMode) localStorage.setItem(lastTemplateKey(), finishedId || "");
+      if (!demoMode && templatesMode === "remote" && finishedId && String(finishedId).indexOf("local-") !== 0) {
         const res = await sb.from("user_settings").update({ last_template_id: finishedId }).eq("user_id", session.user.id);
         if (res.error) console.warn(res.error);
       }
@@ -4972,6 +5129,10 @@
       saveRestSettings();
     }
     async function persistRestMessage(text) {
+      if (demoMode) {
+        restSettings.message = String(text || "").trim().slice(0, 80);
+        return;
+      }
       const msg = String(text || "").trim().slice(0, 80);
       restSettings.message = msg;
       saveRestSettings();
@@ -5304,6 +5465,7 @@
       return out;
     }
     async function postRestAlert(body) {
+      if (demoMode) return { ok: true };
       if (!session) return { ok: false, error: "Not signed in." };
       try {
         const { data } = await sb.auth.getSession();
@@ -5344,6 +5506,7 @@
       return run;
     }
     function persistRestSession() {
+      if (demoMode) return;
       try {
         if (!restSession) localStorage.removeItem(REST_SESSION_KEY);
         else localStorage.setItem(REST_SESSION_KEY, JSON.stringify({
@@ -5386,6 +5549,7 @@
       } catch {}
     }
     async function turnPushOff(opts) {
+      if (demoMode) return;
       const quiet = !!(opts && opts.quiet);
       pushClosing = true;
       const epoch = ++pushEpoch;
@@ -5438,6 +5602,10 @@
       }
     }
     async function setPushAlerts(on, permissionPromise) {
+      if (demoMode) {
+        showToast("Lock-screen alerts stay off in demo mode.");
+        return;
+      }
       if (!on) return turnPushOff();
       const epoch = pushEpoch;
       const blocked = pushEnableBlocker();
