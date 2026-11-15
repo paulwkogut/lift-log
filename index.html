@@ -555,6 +555,13 @@
       flex-shrink: 0;
     }
     body.demo .topbar { top: calc(44px + var(--safe-t)); }
+    .privacy-note {
+      margin: 16px 4px 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+      font-weight: 500;
+    }
     .settings-row:active.tappable { background: var(--surface-2); }
 
     .seg {
@@ -2419,6 +2426,7 @@
           <button class="add-set" type="submit" ${authBusy ? "disabled" : ""}>${authBusy ? busyLabel : submit}</button>
         </form>
         <div class="auth-links">${links}</div>
+        ${mode === "forgot" ? "" : `<p class="privacy-note">Your workouts are saved privately to your account so they sync across devices. Other users can't see your data. We never sell or share it, and you can delete your account and all your data anytime in Settings.</p>`}
       </div></main>`;
     }
 
