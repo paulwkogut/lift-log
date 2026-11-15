@@ -19,7 +19,7 @@ Push / Pull / Legs templates are included. If you ran `supabase/schema.sql` befo
 
 ## Lock-screen rest alerts
 
-The on-screen rest timer works with nothing else set up. Lock-screen alerts need the steps below. The VAPID private key is not in this repo; it was handed over with the change. If you lose it, generate a new pair, put the new private key in the secret, and replace `VAPID_PUBLIC_KEY` in `index.html`.
+The on-screen rest timer works with nothing else set up. A custom rest-over line needs [`supabase/rest-message.sql`](supabase/rest-message.sql). Until that column exists, the app keeps the default message on this phone. Lock-screen alerts need the steps below. The VAPID private key is not in this repo; it was handed over with the change. If you lose it, generate a new pair, put the new private key in the secret, and replace `VAPID_PUBLIC_KEY` in `index.html`.
 
 1. In the Supabase SQL editor, paste and run [`supabase/push.sql`](supabase/push.sql). It is safe to run again.
 2. Open **Edge Functions → Create a new function**. Name it exactly `rest-alert`. Paste the whole file [`supabase/functions/rest-alert/index.ts`](supabase/functions/rest-alert/index.ts) and deploy. You do not need the Supabase CLI.
