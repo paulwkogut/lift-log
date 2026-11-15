@@ -1,4 +1,4 @@
-const SHELL = "lift-log-shell-v9";
+const SHELL = "lift-log-shell-v10";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -40,19 +40,34 @@ self.addEventListener("fetch", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  let data = {};
-  try { data = event.data ? event.data.json() : {}; } catch { data = {}; }
-  const title = data.title || "Rest over";
-  const body = data.body || "Rest over - get to work - don't be a pussy";
-  const target = new URL(data.url || "./", self.registration.scope).href;
-  event.waitUntil(self.registration.showNotification(title, {
-    body,
-    icon: new URL("icon-192.png", self.registration.scope).href,
-    badge: new URL("favicon.png", self.registration.scope).href,
-    tag: "rest-over",
-    renotify: true,
-    data: { url: target }
-  }));
+  const fallback = "Rest over - get to work - don't be a pussy";
+  event.waitUntil((async () => {
+    let title = "Rest over";
+    let body = fallback;
+    let target = new URL("./", self.registration.scope).href;
+    try {
+      const data = event.data ? event.data.json() : null;
+      const note = data && data.notification && typeof data.notification === "object" ? data.notification : data;
+      if (note) {
+        if (note.title) title = String(note.title);
+        if (note.body) body = String(note.body);
+        const dest = note.navigate || note.url;
+        if (dest) target = new URL(String(dest), self.registration.scope).href;
+      }
+    } catch {}
+    try {
+      await self.registration.showNotification(title, {
+        body,
+        icon: new URL("icon-192.png", self.registration.scope).href,
+        data: { url: target }
+      });
+    } catch {
+      await self.registration.showNotification("Rest over", {
+        body: fallback,
+        data: { url: target }
+      });
+    }
+  })());
 });
 
 self.addEventListener("notificationclick", (event) => {

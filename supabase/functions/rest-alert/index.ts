@@ -113,27 +113,49 @@ async function deliver(row: { id: string; user_id: string; exercise_name: string
     .eq("user_id", row.user_id);
   if (!subs || !subs.length) return;
   const server = await pushServer();
+  // iOS 18.4+ shows this without starting the service worker, so it can
+  // appear while the phone is locked. Older phones still get a classic push.
   const payload = JSON.stringify({
-    title: "Rest over",
-    body: "Rest over - get to work - don't be a pussy",
-    url: "./",
+    web_push: 8030,
+    mutable: false,
+    notification: {
+      title: "Rest over",
+      body: "Rest over - get to work - don't be a pussy",
+      navigate: "https://paulwkogut.github.io/lift-log/",
+      mutable: false,
+    },
   });
   for (const sub of subs) {
     const keys = sub.keys || {};
     if (!sub.endpoint || !keys.p256dh || !keys.auth) continue;
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const res = await origFetch(input, init);
+      try {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        if (url === sub.endpoint || url.includes("push.apple.com")) console.log("push response", res.status);
+      } catch (logErr) {
+        console.warn("push log", logErr);
+      }
+      return res;
+    };
     try {
       await server.subscribe({
         endpoint: sub.endpoint,
         keys: { p256dh: keys.p256dh, auth: keys.auth },
       }).pushTextMessage(payload, {
         urgency: webpush.Urgency.High,
-        ttl: 120,
-        topic: "rest-over",
+        ttl: 300,
       });
     } catch (err) {
-      const gone = err && typeof err.isGone === "function" && err.isGone();
-      if (gone) await sb.from("push_subscriptions").delete().eq("id", sub.id);
+      const response = err && (err as { response?: Response }).response;
+      if (response) console.log("push response", response.status);
       else console.warn(err);
+      const gone = err && typeof (err as { isGone?: () => boolean }).isGone === "function" &&
+        (err as { isGone: () => boolean }).isGone();
+      if (gone) await sb.from("push_subscriptions").delete().eq("id", sub.id);
+    } finally {
+      globalThis.fetch = origFetch;
     }
   }
 }
