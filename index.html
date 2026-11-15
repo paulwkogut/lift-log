@@ -522,6 +522,15 @@
     .settings-row .k { font-weight: 650; }
     .settings-row .d { color: var(--muted); font-size: 13px; margin-top: 3px; }
     .settings-row .d.push-status { color: var(--danger); }
+    .settings-row.stack { flex-direction: column; align-items: stretch; }
+    .settings-row.stack .text-input { margin-top: 10px; }
+    .rest-reset {
+      margin-top: 10px;
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 14px;
+      text-align: left;
+    }
     .settings-row:active.tappable { background: var(--surface-2); }
 
     .seg {
@@ -1548,6 +1557,8 @@
     let progressQuery = "";
     let progressMetric = "weight";
     let progressRange = "all";
+    const DEFAULT_REST_MESSAGE = "Break is over bruh. Get back to work";
+    let restMessageColumn = true;
     let historyShown = 12;
     let historyCursor = null;
     let historyFocus = "";
@@ -1836,11 +1847,22 @@
       const [exRes, setRes, settingsRes] = await Promise.all([
         sb.from("exercises").select("id,name,custom,created_at").order("created_at", { ascending: true }),
         sb.from("sets").select("id,exercise_id,weight,reps,unit,performed_at").order("performed_at", { ascending: true }),
-        sb.from("user_settings").select("unit").maybeSingle()
+        sb.from("user_settings").select("unit,rest_message").maybeSingle()
       ]);
       if (exRes.error) throw asError(exRes.error, "Couldn't load exercises.");
       if (setRes.error) throw asError(setRes.error, "Couldn't load sets.");
+      if (settingsRes.error && isMissingColumn(settingsRes.error)) {
+        restMessageColumn = false;
+        const again = await sb.from("user_settings").select("unit").maybeSingle();
+        if (again.error) throw asError(again.error, "Couldn't load settings.");
+        return {
+          exercises: exRes.data || [],
+          sets: setRes.data || [],
+          settings: again.data
+        };
+      }
       if (settingsRes.error) throw asError(settingsRes.error, "Couldn't load settings.");
+      restMessageColumn = true;
       return {
         exercises: exRes.data || [],
         sets: setRes.data || [],
@@ -1892,6 +1914,7 @@
         }
         if (seq !== loadSeq) return;
         applyServerState(pack.exercises, pack.sets, pack.settings);
+        applyRestMessageFromServer(pack.settings);
         await loadTemplates();
         if (seq !== loadSeq) return;
         dataReadyFor = uid;
@@ -3123,6 +3146,14 @@
                 <div class="d">${restSettings.sound !== false ? "Flash the screen and play the beep." : "Flash the screen. Sound is off."} iPhone won't vibrate.</div>
               </div>
             </button>
+            <div class="settings-row stack">
+              <div>
+                <label class="k" for="rest-message">Rest over message</label>
+                <div class="d">Shown when rest ends. 80 characters max.</div>
+              </div>
+              <input id="rest-message" class="text-input" type="text" maxlength="80" autocomplete="off" placeholder="${escapeHtml(DEFAULT_REST_MESSAGE)}" value="${escapeHtml(restSettings.message || "")}">
+              <button type="button" class="rest-reset" data-action="rest-message-reset">Reset to default</button>
+            </div>
           </div>
           <div class="eyebrow">During a workout</div>
           <div class="settings-card">
@@ -3541,6 +3572,14 @@
         });
       });
       bindHomeCalendar();
+      const restMsg = document.getElementById("rest-message");
+      if (restMsg) {
+        restMsg.addEventListener("input", () => {
+          restSettings.message = restMsg.value.slice(0, 80);
+          saveRestSettings();
+        });
+        restMsg.addEventListener("change", () => { persistRestMessage(restMsg.value); });
+      }
 
       const dw = document.getElementById("draft-weight");
       const dr = document.getElementById("draft-reps");
@@ -3802,6 +3841,7 @@
       if (action === "wo-extra-set") return addExtraSet(el.getAttribute("data-id"));
       if (action === "rest-skip") return clearRest();
       if (action === "rest-test") return testRestAlert();
+      if (action === "rest-message-reset") return persistRestMessage("").then(() => render());
       if (action === "rest-pause") return toggleRestPause();
       if (action === "rest-adjust") return adjustRest(Number(el.getAttribute("data-dir")));
       if (action === "rest-auto") return setRestAuto(el.getAttribute("data-on") === "1");
@@ -4921,6 +4961,31 @@
       const r = s % 60;
       return m + ":" + String(r).padStart(2, "0");
     }
+    function restOverMessage() {
+      const msg = restSettings && typeof restSettings.message === "string" ? restSettings.message.trim() : "";
+      return msg || DEFAULT_REST_MESSAGE;
+    }
+    function applyRestMessageFromServer(settings) {
+      if (!settings || !Object.prototype.hasOwnProperty.call(settings, "rest_message")) return;
+      const raw = settings.rest_message == null ? "" : String(settings.rest_message);
+      restSettings.message = raw.trim().slice(0, 80);
+      saveRestSettings();
+    }
+    async function persistRestMessage(text) {
+      const msg = String(text || "").trim().slice(0, 80);
+      restSettings.message = msg;
+      saveRestSettings();
+      if (!session || restMessageColumn === false) return;
+      const res = await sb.from("user_settings").update({
+        rest_message: msg || null,
+        updated_at: new Date().toISOString()
+      }).eq("user_id", session.user.id);
+      if (res.error && isMissingColumn(res.error)) {
+        restMessageColumn = false;
+        return;
+      }
+      if (res.error) showToast(res.error.message || "Couldn't save that message.");
+    }
     function loadRestSettings() {
       try {
         const raw = JSON.parse(localStorage.getItem("lift-log-rest-v1") || "null") || {};
@@ -4931,10 +4996,11 @@
           wake: raw.wake !== false,
           push: raw.push === true,
           seconds: clampTarget(raw.seconds, 30, 300, 90),
+          message: typeof raw.message === "string" ? raw.message.trim().slice(0, 80) : "",
           overrides
         };
       } catch {
-        restSettings = { auto: true, sound: true, wake: true, push: false, seconds: 90, overrides: {} };
+        restSettings = { auto: true, sound: true, wake: true, push: false, seconds: 90, message: "", overrides: {} };
       }
     }
     function saveRestSettings() {
@@ -4963,10 +5029,11 @@
     function restSheetHtml() {
       if (!restSession) return "";
       if (restSession.phase === "done") {
-        return `<div class="rest-flash" id="rest-flash" role="alertdialog" aria-label="Break is over bruh. Get back to work">
+        const msg = escapeHtml(restOverMessage());
+        return `<div class="rest-flash" id="rest-flash" role="alertdialog" aria-label="${msg}">
           <div>
             <div class="rest-kicker">REST OVER</div>
-            <h2>Break is over bruh. Get back to work</h2>
+            <h2>${msg}</h2>
             <p>${restSettings.sound === false ? "Log the next set when you're ready." : "The beep repeats until you log the next set."}</p>
             <button type="button" class="rest-stop" data-action="rest-skip">Stop</button>
           </div>
@@ -5072,7 +5139,7 @@
         // push is the notification. Creating another one here is what shows up
         // the moment the phone is unlocked.
         if (!restSettings.push && typeof Notification !== "undefined" && Notification.permission === "granted") {
-          new Notification("Lift Log", { body: "Break is over bruh. Get back to work" });
+          new Notification("Lift Log", { body: restOverMessage() });
         }
       } catch {}
       if (!once) startRestBeeps();

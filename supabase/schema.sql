@@ -158,6 +158,21 @@ alter table public.user_settings
   add column if not exists last_template_id uuid,
   add column if not exists templates_seeded boolean not null default false;
 
+alter table public.user_settings
+  add column if not exists rest_message text;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'user_settings_rest_message_len'
+  ) then
+    alter table public.user_settings
+      add constraint user_settings_rest_message_len
+      check (rest_message is null or char_length(rest_message) <= 80);
+  end if;
+end $$;
+
 alter table public.templates enable row level security;
 revoke all on table public.templates from anon, public;
 grant select, insert, update, delete on table public.templates to authenticated;
