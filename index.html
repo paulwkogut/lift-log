@@ -4921,7 +4921,11 @@
         try { playBeep(); } catch {}
       }
       try {
-        if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        // A page notification can only be created while this app is visible, so it
+        // never appears on the lock screen. When lock-screen alerts are on, the
+        // push is the notification. Creating another one here is what shows up
+        // the moment the phone is unlocked.
+        if (!restSettings.push && typeof Notification !== "undefined" && Notification.permission === "granted") {
           new Notification("Lift Log", { body: "Rest over - get to work - don't be a pussy" });
         }
       } catch {}
