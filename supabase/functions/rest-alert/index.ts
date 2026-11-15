@@ -120,7 +120,7 @@ async function deliver(row: { id: string; user_id: string; exercise_name: string
     mutable: false,
     notification: {
       title: "Rest over",
-      body: "Rest over - get to work - don't be a pussy",
+      body: "Break is over bruh. Get back to work",
       navigate: "https://paulwkogut.github.io/lift-log/",
       mutable: false,
     },

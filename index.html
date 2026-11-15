@@ -4963,10 +4963,10 @@
     function restSheetHtml() {
       if (!restSession) return "";
       if (restSession.phase === "done") {
-        return `<div class="rest-flash" id="rest-flash" role="alertdialog" aria-label="Rest over - get to work - don't be a pussy">
+        return `<div class="rest-flash" id="rest-flash" role="alertdialog" aria-label="Break is over bruh. Get back to work">
           <div>
             <div class="rest-kicker">REST OVER</div>
-            <h2>Rest over - get to work - don't be a pussy</h2>
+            <h2>Break is over bruh. Get back to work</h2>
             <p>${restSettings.sound === false ? "Log the next set when you're ready." : "The beep repeats until you log the next set."}</p>
             <button type="button" class="rest-stop" data-action="rest-skip">Stop</button>
           </div>
@@ -5072,7 +5072,7 @@
         // push is the notification. Creating another one here is what shows up
         // the moment the phone is unlocked.
         if (!restSettings.push && typeof Notification !== "undefined" && Notification.permission === "granted") {
-          new Notification("Lift Log", { body: "Rest over - get to work - don't be a pussy" });
+          new Notification("Lift Log", { body: "Break is over bruh. Get back to work" });
         }
       } catch {}
       if (!once) startRestBeeps();
