@@ -1,4 +1,4 @@
-const SHELL = "lift-log-shell-v11";
+const SHELL = "lift-log-shell-v12";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -40,7 +40,7 @@ self.addEventListener("fetch", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  const fallback = "Rest over - get to work - don't be a pussy";
+  const fallback = "Break is over bruh. Get back to work";
   event.waitUntil((async () => {
     let title = "Rest over";
     let body = fallback;
