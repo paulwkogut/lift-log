@@ -255,6 +255,62 @@
     .ex-row .chev, .ex-row .chev-btn { color: var(--faint); flex-shrink: 0; }
     .ex-row .chev-btn { min-width: 44px; min-height: 44px; }
     .ex-row .chev { color: var(--faint); flex-shrink: 0; }
+    .ex-row.cal-jump { border-color: var(--accent); }
+
+    .cal {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 8px 8px 12px;
+      margin-bottom: 16px;
+      touch-action: pan-y;
+    }
+    .cal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 4px;
+    }
+    .cal-head h2 {
+      font-size: 17px;
+      font-weight: 750;
+      letter-spacing: -0.02em;
+    }
+    .cal-head .icon-btn { width: 40px; height: 40px; }
+    .cal-next { display: grid; transform: scaleX(-1); }
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 2px;
+      margin-top: 4px;
+    }
+    .cal-dow {
+      text-align: center;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 0;
+    }
+    .cal-day {
+      aspect-ratio: 1;
+      min-height: 36px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      font-size: 14px;
+      font-weight: 650;
+      font-variant-numeric: tabular-nums;
+    }
+    .cal-day.empty { visibility: hidden; }
+    .cal-day.mark { background: var(--accent); color: var(--accent-ink); }
+    .cal-day.today { box-shadow: inset 0 0 0 1.5px var(--accent); }
+    .cal-day.mark.today { box-shadow: inset 0 0 0 1.5px var(--accent-ink); }
+    .cal-count {
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 8px;
+    }
     .add-ex-wrap {
       position: sticky;
       bottom: 0;
@@ -1493,6 +1549,9 @@
     let progressMetric = "weight";
     let progressRange = "all";
     let historyShown = 12;
+    let historyCursor = null;
+    let historyFocus = "";
+    let historyDidSwipe = false;
     let adminStats;
     let adminStatsBusy = false;
     let adminStatsToken = 0;
@@ -2223,6 +2282,11 @@
         focusWorkoutId = "";
         if (target && target.scrollIntoView) target.scrollIntoView({ block: "start" });
       }
+      if (historyFocus) {
+        const target = document.getElementById("hist-" + historyFocus);
+        historyFocus = "";
+        if (target && target.scrollIntoView) target.scrollIntoView({ block: "center" });
+      }
     }
 
     function hydrateAuthFields() {
@@ -2614,7 +2678,7 @@
         const bits = [day.exerciseIds.length + " exercise" + (day.exerciseIds.length === 1 ? "" : "s"), day.sets.length + " set" + (day.sets.length === 1 ? "" : "s"), volumeLabel(day)];
         if (day.duration) bits.push(day.duration);
         const title = formatDay(day.date) + (day.templateName ? " · " + day.templateName : "");
-        return `<button type="button" class="ex-row" data-go="#/history/${day.date}">
+        return `<button type="button" class="ex-row${historyFocus === day.date ? " cal-jump" : ""}" id="hist-${day.date}" data-go="#/history/${day.date}">
           <span class="meta"><span class="name">${escapeHtml(title)}</span><span class="last">${escapeHtml(bits.join(" · "))}</span></span>
           <span class="chev" aria-hidden="true">${chevron()}</span>
         </button>`;
@@ -2632,6 +2696,84 @@
         </main>`;
     }
 
+    function shiftHistoryMonth(dir) {
+      const now = new Date();
+      if (!historyCursor) historyCursor = { y: now.getFullYear(), m: now.getMonth() };
+      const next = new Date(historyCursor.y, historyCursor.m + dir, 1);
+      historyCursor = { y: next.getFullYear(), m: next.getMonth() };
+      render();
+    }
+    function openHistoryDay(date) {
+      if (historyDidSwipe) { historyDidSwipe = false; return; }
+      if (!date) return;
+      const days = workoutHistory();
+      const index = days.findIndex(item => item.date === date);
+      if (index < 0) return;
+      if (historyShown < index + 1) historyShown = index + 1;
+      historyFocus = date;
+      go("#/history");
+    }
+    function renderHomeCalendar() {
+      const now = new Date();
+      if (!historyCursor) historyCursor = { y: now.getFullYear(), m: now.getMonth() };
+      const y = historyCursor.y;
+      const m = historyCursor.m;
+      const prefix = y + "-" + String(m + 1).padStart(2, "0") + "-";
+      const marks = new Set();
+      state.sets.forEach(s => {
+        const key = todayKey(s.createdAt);
+        if (key.indexOf(prefix) === 0) marks.add(key);
+      });
+      const today = todayKey(Date.now());
+      const firstDow = new Date(y, m, 1).getDay();
+      const countDays = new Date(y, m + 1, 0).getDate();
+      const label = new Date(y, m, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+      const dows = ["S", "M", "T", "W", "T", "F", "S"].map(ch => `<div class="cal-dow" aria-hidden="true">${ch}</div>`).join("");
+      let cells = "";
+      for (let i = 0; i < firstDow; i++) cells += `<div class="cal-day empty"></div>`;
+      for (let day = 1; day <= countDays; day++) {
+        const key = prefix + String(day).padStart(2, "0");
+        const marked = marks.has(key);
+        const cls = "cal-day" + (marked ? " mark" : "") + (key === today ? " today" : "");
+        if (marked) {
+          cells += `<button type="button" class="${cls}" data-action="cal-day" data-date="${key}" aria-label="${escapeHtml(formatDay(key))}">${day}</button>`;
+        } else {
+          cells += `<div class="${cls}"${key === today ? ' aria-current="date"' : ""}>${day}</div>`;
+        }
+      }
+      const n = marks.size;
+      const count = n === 0 ? "No workouts this month" : n === 1 ? "1 workout this month" : n + " workouts this month";
+      return `<section class="cal" id="home-cal" aria-label="Workout calendar">
+        <div class="cal-head">
+          <button type="button" class="icon-btn" data-action="cal-month" data-dir="-1" aria-label="Previous month">${backIcon()}</button>
+          <h2>${escapeHtml(label)}</h2>
+          <button type="button" class="icon-btn" data-action="cal-month" data-dir="1" aria-label="Next month"><span class="cal-next">${backIcon()}</span></button>
+        </div>
+        <div class="cal-grid">${dows}${cells}</div>
+        <p class="cal-count">${escapeHtml(count)}</p>
+      </section>`;
+    }
+    function bindHomeCalendar() {
+      const cal = document.getElementById("home-cal");
+      if (!cal) return;
+      let startX = 0, startY = 0, tracking = false;
+      cal.addEventListener("pointerdown", (e) => {
+        historyDidSwipe = false;
+        tracking = true;
+        startX = e.clientX;
+        startY = e.clientY;
+      });
+      cal.addEventListener("pointerup", (e) => {
+        if (!tracking) return;
+        tracking = false;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy)) return;
+        historyDidSwipe = true;
+        shiftHistoryMonth(dx < 0 ? 1 : -1);
+      });
+      cal.addEventListener("pointercancel", () => { tracking = false; });
+    }
     function renderHome() {
       const used = new Map();
       for (const s of state.sets) used.set(s.exerciseId, s.createdAt);
@@ -2663,6 +2805,7 @@
           <button class="icon-btn" data-go="#/settings" aria-label="Settings">${gearIcon()}</button>
         </header>
         <main class="screen">
+          ${renderHomeCalendar()}
           ${renderWorkoutSection()}
           <div class="eyebrow">Exercises</div>
           <button type="button" class="browse-lib" data-go="#/progress">Progress</button>
@@ -3397,6 +3540,7 @@
           handleAction(action, el);
         });
       });
+      bindHomeCalendar();
 
       const dw = document.getElementById("draft-weight");
       const dr = document.getElementById("draft-reps");
@@ -3673,6 +3817,8 @@
       if (action === "wo-add-set") return addWorkoutSet(el.getAttribute("data-id"));
       if (action === "finish-workout") return finishWorkout();
       if (action === "history-more") { historyShown += 12; render(); return; }
+      if (action === "cal-month") return shiftHistoryMonth(Number(el.getAttribute("data-dir")));
+      if (action === "cal-day") return openHistoryDay(el.getAttribute("data-date"));
       if (action === "history-delete-open") {
         const day = workoutHistory().find(item => item.date === el.getAttribute("data-date"));
         modal = { type: "delete-workout", date: el.getAttribute("data-date"), count: day ? day.sets.length : 0 };
