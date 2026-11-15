@@ -113,6 +113,16 @@ async function deliver(row: { id: string; user_id: string; exercise_name: string
     .eq("user_id", row.user_id);
   if (!subs || !subs.length) return;
   const server = await pushServer();
+  const DEFAULT_REST_MESSAGE = "Break is over bruh. Get back to work";
+  let restBody = DEFAULT_REST_MESSAGE;
+  const { data: prefs, error: prefsError } = await sb
+    .from("user_settings")
+    .select("rest_message")
+    .eq("user_id", row.user_id)
+    .maybeSingle();
+  if (prefsError) console.warn(prefsError);
+  const custom = prefs && typeof prefs.rest_message === "string" ? prefs.rest_message.trim() : "";
+  if (custom) restBody = custom.slice(0, 80);
   // iOS 18.4+ shows this without starting the service worker, so it can
   // appear while the phone is locked. Older phones still get a classic push.
   const payload = JSON.stringify({
@@ -120,7 +130,7 @@ async function deliver(row: { id: string; user_id: string; exercise_name: string
     mutable: false,
     notification: {
       title: "Rest over",
-      body: "Break is over bruh. Get back to work",
+      body: restBody,
       navigate: "https://paulwkogut.github.io/lift-log/",
       mutable: false,
     },

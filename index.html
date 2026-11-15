@@ -522,6 +522,47 @@
     .settings-row .k { font-weight: 650; }
     .settings-row .d { color: var(--muted); font-size: 13px; margin-top: 3px; }
     .settings-row .d.push-status { color: var(--danger); }
+    .settings-row.stack { flex-direction: column; align-items: stretch; }
+    .settings-row.stack .text-input,
+    .settings-row.stack .add-set { margin-top: 10px; }
+    .rest-reset {
+      margin-top: 10px;
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 14px;
+      text-align: left;
+    }
+    .demo-banner {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: calc(8px + var(--safe-t)) 12px 8px;
+      background: var(--accent);
+      color: var(--accent-ink);
+      font-size: 13px;
+      font-weight: 750;
+    }
+    .demo-banner button {
+      background: var(--bg);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-weight: 750;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+    body.demo .topbar { top: calc(44px + var(--safe-t)); }
+    .privacy-note {
+      margin: 16px 4px 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+      font-weight: 500;
+    }
     .settings-row:active.tappable { background: var(--surface-2); }
 
     .seg {
@@ -1548,10 +1589,15 @@
     let progressQuery = "";
     let progressMetric = "weight";
     let progressRange = "all";
+    const DEFAULT_REST_MESSAGE = "Break is over bruh. Get back to work";
+    let restMessageColumn = true;
     let historyShown = 12;
     let historyCursor = null;
     let historyFocus = "";
     let historyDidSwipe = false;
+    let demoMode = false;
+    let demoBackup = null;
+    let passwordDraft = { next: "", confirm: "" };
     let adminStats;
     let adminStatsBusy = false;
     let adminStatsToken = 0;
@@ -1836,11 +1882,22 @@
       const [exRes, setRes, settingsRes] = await Promise.all([
         sb.from("exercises").select("id,name,custom,created_at").order("created_at", { ascending: true }),
         sb.from("sets").select("id,exercise_id,weight,reps,unit,performed_at").order("performed_at", { ascending: true }),
-        sb.from("user_settings").select("unit").maybeSingle()
+        sb.from("user_settings").select("unit,rest_message").maybeSingle()
       ]);
       if (exRes.error) throw asError(exRes.error, "Couldn't load exercises.");
       if (setRes.error) throw asError(setRes.error, "Couldn't load sets.");
+      if (settingsRes.error && isMissingColumn(settingsRes.error)) {
+        restMessageColumn = false;
+        const again = await sb.from("user_settings").select("unit").maybeSingle();
+        if (again.error) throw asError(again.error, "Couldn't load settings.");
+        return {
+          exercises: exRes.data || [],
+          sets: setRes.data || [],
+          settings: again.data
+        };
+      }
       if (settingsRes.error) throw asError(settingsRes.error, "Couldn't load settings.");
+      restMessageColumn = true;
       return {
         exercises: exRes.data || [],
         sets: setRes.data || [],
@@ -1871,6 +1928,7 @@
     }
 
     async function doLoad() {
+      if (demoMode) return;
       const seq = ++loadSeq;
       const uid = session && session.user && session.user.id;
       if (!uid) return;
@@ -1892,6 +1950,7 @@
         }
         if (seq !== loadSeq) return;
         applyServerState(pack.exercises, pack.sets, pack.settings);
+        applyRestMessageFromServer(pack.settings);
         await loadTemplates();
         if (seq !== loadSeq) return;
         dataReadyFor = uid;
@@ -1911,6 +1970,7 @@
     }
 
     async function persistExerciseInsert(ex) {
+      if (demoMode) return;
       const res = await sb.from("exercises").insert({
         id: ex.id,
         user_id: session.user.id,
@@ -1922,16 +1982,19 @@
     }
 
     async function persistExerciseName(id, name) {
+      if (demoMode) return;
       const res = await sb.from("exercises").update({ name }).eq("id", id);
       if (res.error) throw asError(res.error, "Couldn't rename that exercise.");
     }
 
     async function persistExerciseDelete(id) {
+      if (demoMode) return;
       const res = await sb.from("exercises").delete().eq("id", id);
       if (res.error) throw asError(res.error, "Couldn't delete that exercise.");
     }
 
     async function persistSetInsert(row, displayWeight) {
+      if (demoMode) return;
       const res = await sb.from("sets").insert({
         id: row.id,
         user_id: session.user.id,
@@ -1945,6 +2008,7 @@
     }
 
     async function persistSetUpdate(id, displayWeight, reps) {
+      if (demoMode) return;
       const res = await sb.from("sets").update({
         weight: displayWeight,
         reps,
@@ -1954,11 +2018,13 @@
     }
 
     async function persistSetDelete(id) {
+      if (demoMode) return;
       const res = await sb.from("sets").delete().eq("id", id);
       if (res.error) throw asError(res.error, "Couldn't delete that set.");
     }
 
     async function persistUnit(next) {
+      if (demoMode) return;
       const res = await sb.from("user_settings").upsert({
         user_id: session.user.id,
         unit: next,
@@ -2249,6 +2315,11 @@
       if (tutorialOpen && session && screen !== "loading" && screen !== "auth") html += renderTutorial();
       if (toastMsg) html += `<div class="toast" role="status">${escapeHtml(toastMsg)}</div>`;
       if (session && restSession && screen !== "loading" && screen !== "auth" && screen !== "recovery") html += restSheetHtml();
+      if (demoMode) document.body.classList.add("demo");
+      else document.body.classList.remove("demo");
+      if (demoMode && screen !== "auth" && screen !== "loading" && screen !== "recovery") {
+        html = `<div class="demo-banner"><span>Demo mode, changes aren't saved</span><button type="button" data-action="exit-demo">Exit demo</button></div>` + html;
+      }
       appEl.innerHTML = html;
       hydrateAuthFields();
       bind();
@@ -2341,7 +2412,7 @@
         ${mode === "signup" ? `<label class="field-lbl" for="auth-password2">Confirm password</label>
         <input class="text-input" id="auth-password2" name="password2" type="password" autocomplete="new-password" aria-label="Confirm password">` : ""}`;
       const links = mode === "login"
-        ? `<button type="button" class="auth-link" data-action="auth-mode" data-mode="forgot">Forgot password</button>
+        ? `<button type="button" class="auth-link" data-action="auth-mode" data-mode="forgot">Forgot password?</button>
            <button type="button" class="auth-link" data-action="auth-mode" data-mode="signup">Need an account? Sign up</button>`
         : mode === "signup"
           ? `<button type="button" class="auth-link" data-action="auth-mode" data-mode="login">Already have an account? Log in</button>`
@@ -2357,6 +2428,7 @@
           <button class="add-set" type="submit" ${authBusy ? "disabled" : ""}>${authBusy ? busyLabel : submit}</button>
         </form>
         <div class="auth-links">${links}</div>
+        ${mode === "forgot" ? "" : `<p class="privacy-note">Your workouts are saved privately to your account so they sync across devices. Other users can't see your data. We never sell or share it, and you can delete your account and all your data anytime in Settings.</p>`}
       </div></main>`;
     }
 
@@ -2982,6 +3054,100 @@
         <text x="${w}" y="${h - 4}" fill="var(--muted)" font-size="10" text-anchor="end">${label(list[list.length - 1])}</text>
       </svg>`;
     }
+    function buildDemoData() {
+      const plans = [
+        { name: "Push", kind: "push", items: [["Bench Press", 135, 5, 5], ["Overhead Press", 75, 8, 5], ["Incline Dumbbell Press", 50, 8, 5], ["Lateral Raise", 15, 12, 2.5], ["Triceps Pushdown", 50, 10, 5]] },
+        { name: "Pull", kind: "pull", items: [["Pull-up", 0, 6, 0], ["Barbell Row", 115, 8, 5], ["Lat Pulldown", 100, 10, 5], ["Face Pull", 40, 12, 5], ["Barbell Curl", 55, 10, 2.5]] },
+        { name: "Legs", kind: "legs", items: [["Squat", 155, 5, 5], ["Romanian Deadlift", 135, 8, 5], ["Leg Press", 180, 10, 10], ["Leg Curl", 70, 10, 5], ["Calf Raise", 100, 12, 5]] }
+      ];
+      const names = [];
+      plans.forEach(plan => plan.items.forEach(item => { if (names.indexOf(item[0]) < 0) names.push(item[0]); }));
+      const monday = new Date();
+      monday.setHours(0, 0, 0, 0);
+      const dow = monday.getDay();
+      monday.setDate(monday.getDate() + (dow === 0 ? -6 : 1 - dow) - 7 * 7);
+      const createdAt = monday.getTime();
+      const idByName = {};
+      const exercises = names.map(name => {
+        const id = "demo-" + name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+        idByName[name] = id;
+        return { id, name, custom: false, createdAt };
+      });
+      const templates = plans.map((plan, i) => ({
+        id: "demo-" + plan.kind,
+        name: plan.name,
+        kind: plan.kind,
+        position: i,
+        exerciseNames: plan.items.map(item => item[0]),
+        targets: plan.items.map(item => ({ sets: 3, reps: item[2] }))
+      }));
+      const sets = [];
+      let n = 0;
+      for (let week = 0; week < 8; week++) {
+        plans.forEach((plan, pi) => {
+          const day = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + week * 7 + pi * 2, 18, 0, 0, 0);
+          if (day.getTime() > Date.now()) return;
+          plan.items.forEach((item, ei) => {
+            const bodyweight = item[1] === 0;
+            const weight = bodyweight ? 0 : item[1] + week * item[3];
+            const reps = bodyweight ? Math.min(12, item[2] + Math.floor(week / 2)) : item[2];
+            for (let set = 0; set < 3; set++) {
+              sets.push({
+                id: "demo-set-" + (n++),
+                exerciseId: idByName[item[0]],
+                weightLbs: weight,
+                reps,
+                createdAt: day.getTime() + (ei * 3 + set) * 60000
+              });
+            }
+          });
+        });
+      }
+      return { exercises, sets, templates };
+    }
+    function enterDemo() {
+      if (demoMode || !adminStats) return;
+      demoBackup = {
+        state: JSON.parse(JSON.stringify(state)),
+        activeWorkout: activeWorkout ? JSON.parse(JSON.stringify(activeWorkout)) : null,
+        templatesMode
+      };
+      demoMode = true;
+      restSession = null;
+      restAlerted = false;
+      clearInterval(restTick);
+      stopRestBeeps();
+      activeWorkout = null;
+      workoutDrafts = {};
+      planDrafts = {};
+      const sample = buildDemoData();
+      state = {
+        version: 2,
+        settings: { unit: state.settings && state.settings.unit === "kg" ? "kg" : "lbs" },
+        exercises: sample.exercises,
+        sets: sample.sets,
+        templates: sample.templates,
+        lastTemplateId: sample.templates[0].id
+      };
+      templatesMode = "local";
+      go("#/");
+    }
+    function exitDemo() {
+      if (!demoBackup) { demoMode = false; document.body.classList.remove("demo"); return; }
+      state = demoBackup.state;
+      activeWorkout = demoBackup.activeWorkout;
+      templatesMode = demoBackup.templatesMode;
+      workoutDrafts = {};
+      planDrafts = {};
+      demoBackup = null;
+      demoMode = false;
+      restSession = null;
+      restAlerted = false;
+      clearInterval(restTick);
+      stopRestBeeps();
+      restoreRestSession();
+      go("#/");
+    }
     function renderAdmin() {
       if (!adminStats) {
         return `<header class="topbar">
@@ -3040,6 +3206,15 @@
                 <div class="d">End this session on this phone</div>
               </div>
             </button>
+            <div class="settings-row stack">
+              <div>
+                <div class="k">Change password</div>
+                <div class="d">At least 8 characters.</div>
+              </div>
+              <input id="new-password" class="text-input" type="password" autocomplete="new-password" placeholder="New password" maxlength="72" ${demoMode ? "disabled" : ""} aria-label="New password">
+              <input id="confirm-password" class="text-input" type="password" autocomplete="new-password" placeholder="Confirm password" maxlength="72" ${demoMode ? "disabled" : ""} aria-label="Confirm password">
+              <button type="button" class="add-set" data-action="change-password" ${demoMode ? "disabled" : ""}>Update password</button>
+            </div>
           </div>
           ${adminStats ? `<div class="eyebrow">Admin</div>
           <div class="settings-card">
@@ -3050,6 +3225,12 @@
               </div>
               <span class="chev">${chevron()}</span>
             </button>
+            ${demoMode ? "" : `<button type="button" class="settings-row tappable" data-action="open-demo">
+              <div>
+                <div class="k">Open demo</div>
+                <div class="d">Sample workouts for the last 8 weeks. Nothing is saved.</div>
+              </div>
+            </button>`}
           </div>` : ""}
           <div class="eyebrow">Units</div>
           <div class="settings-card">
@@ -3123,6 +3304,14 @@
                 <div class="d">${restSettings.sound !== false ? "Flash the screen and play the beep." : "Flash the screen. Sound is off."} iPhone won't vibrate.</div>
               </div>
             </button>
+            <div class="settings-row stack">
+              <div>
+                <label class="k" for="rest-message">Rest over message</label>
+                <div class="d">Shown when rest ends. 80 characters max.</div>
+              </div>
+              <input id="rest-message" class="text-input" type="text" maxlength="80" autocomplete="off" placeholder="${escapeHtml(DEFAULT_REST_MESSAGE)}" value="${escapeHtml(restSettings.message || "")}">
+              <button type="button" class="rest-reset" data-action="rest-message-reset">Reset to default</button>
+            </div>
           </div>
           <div class="eyebrow">During a workout</div>
           <div class="settings-card">
@@ -3541,6 +3730,24 @@
         });
       });
       bindHomeCalendar();
+      const newPw = document.getElementById("new-password");
+      const confirmPw = document.getElementById("confirm-password");
+      if (newPw) {
+        newPw.value = passwordDraft.next;
+        newPw.addEventListener("input", () => { passwordDraft.next = newPw.value; });
+      }
+      if (confirmPw) {
+        confirmPw.value = passwordDraft.confirm;
+        confirmPw.addEventListener("input", () => { passwordDraft.confirm = confirmPw.value; });
+      }
+      const restMsg = document.getElementById("rest-message");
+      if (restMsg) {
+        restMsg.addEventListener("input", () => {
+          restSettings.message = restMsg.value.slice(0, 80);
+          saveRestSettings();
+        });
+        restMsg.addEventListener("change", () => { persistRestMessage(restMsg.value); });
+      }
 
       const dw = document.getElementById("draft-weight");
       const dr = document.getElementById("draft-reps");
@@ -3667,7 +3874,11 @@
         loadAccount();
         return;
       }
+      if (action === "open-demo") return enterDemo();
+      if (action === "exit-demo") return exitDemo();
+      if (action === "change-password") return changePassword();
       if (action === "log-out") {
+        if (demoMode) exitDemo();
         authForm.password = "";
         authForm.password2 = "";
         try {
@@ -3802,6 +4013,7 @@
       if (action === "wo-extra-set") return addExtraSet(el.getAttribute("data-id"));
       if (action === "rest-skip") return clearRest();
       if (action === "rest-test") return testRestAlert();
+      if (action === "rest-message-reset") return persistRestMessage("").then(() => render());
       if (action === "rest-pause") return toggleRestPause();
       if (action === "rest-adjust") return adjustRest(Number(el.getAttribute("data-dir")));
       if (action === "rest-auto") return setRestAuto(el.getAttribute("data-on") === "1");
@@ -3845,7 +4057,7 @@
       try {
         if (mode === "forgot") {
           const { error } = await sb.auth.resetPasswordForEmail(authForm.email.trim(), {
-            redirectTo: currentPageUrl()
+            redirectTo: SHARE_LINK
           });
           if (error) throw error;
           authNotice = "Check your email for a link to reset your password.";
@@ -3877,6 +4089,34 @@
       } finally {
         authBusy = false;
         render();
+      }
+    }
+
+    async function changePassword() {
+      if (demoMode) {
+        showToast("Exit demo before changing your password.");
+        return;
+      }
+      const nextEl = document.getElementById("new-password");
+      const confirmEl = document.getElementById("confirm-password");
+      const next = nextEl ? nextEl.value : passwordDraft.next;
+      const confirm = confirmEl ? confirmEl.value : passwordDraft.confirm;
+      passwordDraft = { next, confirm };
+      if (next.length < 8) {
+        showToast("Use at least 8 characters.");
+        return;
+      }
+      if (next !== confirm) {
+        showToast("Passwords don't match.");
+        return;
+      }
+      try {
+        const { error } = await sb.auth.updateUser({ password: next });
+        if (error) throw error;
+        passwordDraft = { next: "", confirm: "" };
+        showToast("Password updated");
+      } catch (err) {
+        showToast(err.message || "Couldn't update that password.");
       }
     }
 
@@ -4092,6 +4332,10 @@
       try { releaseScreenLock(); } catch {}
     }
     async function deleteAccount() {
+      if (demoMode) {
+        showToast("Exit demo before deleting the account.");
+        return;
+      }
       if (!modal || modal.type !== "delete-account" || modal.busy) return;
       const typed = (document.getElementById("delete-confirm") || {}).value || modal.phrase || "";
       if (String(typed).trim() !== "DELETE") return;
@@ -4138,6 +4382,10 @@
     }
 
     function chooseImportFile() {
+      if (demoMode) {
+        showToast("Exit demo before importing.");
+        return;
+      }
       const input = document.getElementById("import-file");
       if (!input) return;
       input.value = "";
@@ -4164,6 +4412,10 @@
     }
 
     async function doImport() {
+      if (demoMode) {
+        showToast("Exit demo before importing.");
+        return;
+      }
       if (!modal || modal.type !== "confirm-import" || modal.busy) return;
       const data = modal.data;
       modal = { type: "confirm-import", data, busy: true };
@@ -4264,6 +4516,7 @@
       }
     }
     function cacheTemplates() {
+      if (demoMode) return;
       if (!session || !session.user) return;
       localStorage.setItem(templatesCacheKey(), JSON.stringify({
         seeded: true,
@@ -4333,10 +4586,12 @@
       }
     }
     function persistActive() {
+      if (demoMode) return;
       if (!activeWorkout) localStorage.removeItem(activeWorkoutKey());
       else localStorage.setItem(activeWorkoutKey(), JSON.stringify(activeWorkout));
     }
     async function loadTemplates() {
+      if (demoMode) return;
       try {
         let res = await sb.from("templates").select("id,name,kind,position,exercise_names,exercise_targets").order("position", { ascending: true });
         if (res.error && isMissingColumn(res.error)) {
@@ -4698,8 +4953,8 @@
       if (!activeWorkout) return go("#/");
       const finishedId = activeWorkout.templateId;
       state.lastTemplateId = finishedId;
-      localStorage.setItem(lastTemplateKey(), finishedId || "");
-      if (templatesMode === "remote" && finishedId && String(finishedId).indexOf("local-") !== 0) {
+      if (!demoMode) localStorage.setItem(lastTemplateKey(), finishedId || "");
+      if (!demoMode && templatesMode === "remote" && finishedId && String(finishedId).indexOf("local-") !== 0) {
         const res = await sb.from("user_settings").update({ last_template_id: finishedId }).eq("user_id", session.user.id);
         if (res.error) console.warn(res.error);
       }
@@ -4921,6 +5176,35 @@
       const r = s % 60;
       return m + ":" + String(r).padStart(2, "0");
     }
+    function restOverMessage() {
+      const msg = restSettings && typeof restSettings.message === "string" ? restSettings.message.trim() : "";
+      return msg || DEFAULT_REST_MESSAGE;
+    }
+    function applyRestMessageFromServer(settings) {
+      if (!settings || !Object.prototype.hasOwnProperty.call(settings, "rest_message")) return;
+      const raw = settings.rest_message == null ? "" : String(settings.rest_message);
+      restSettings.message = raw.trim().slice(0, 80);
+      saveRestSettings();
+    }
+    async function persistRestMessage(text) {
+      if (demoMode) {
+        restSettings.message = String(text || "").trim().slice(0, 80);
+        return;
+      }
+      const msg = String(text || "").trim().slice(0, 80);
+      restSettings.message = msg;
+      saveRestSettings();
+      if (!session || restMessageColumn === false) return;
+      const res = await sb.from("user_settings").update({
+        rest_message: msg || null,
+        updated_at: new Date().toISOString()
+      }).eq("user_id", session.user.id);
+      if (res.error && isMissingColumn(res.error)) {
+        restMessageColumn = false;
+        return;
+      }
+      if (res.error) showToast(res.error.message || "Couldn't save that message.");
+    }
     function loadRestSettings() {
       try {
         const raw = JSON.parse(localStorage.getItem("lift-log-rest-v1") || "null") || {};
@@ -4931,10 +5215,11 @@
           wake: raw.wake !== false,
           push: raw.push === true,
           seconds: clampTarget(raw.seconds, 30, 300, 90),
+          message: typeof raw.message === "string" ? raw.message.trim().slice(0, 80) : "",
           overrides
         };
       } catch {
-        restSettings = { auto: true, sound: true, wake: true, push: false, seconds: 90, overrides: {} };
+        restSettings = { auto: true, sound: true, wake: true, push: false, seconds: 90, message: "", overrides: {} };
       }
     }
     function saveRestSettings() {
@@ -4963,10 +5248,11 @@
     function restSheetHtml() {
       if (!restSession) return "";
       if (restSession.phase === "done") {
-        return `<div class="rest-flash" id="rest-flash" role="alertdialog" aria-label="Break is over bruh. Get back to work">
+        const msg = escapeHtml(restOverMessage());
+        return `<div class="rest-flash" id="rest-flash" role="alertdialog" aria-label="${msg}">
           <div>
             <div class="rest-kicker">REST OVER</div>
-            <h2>Break is over bruh. Get back to work</h2>
+            <h2>${msg}</h2>
             <p>${restSettings.sound === false ? "Log the next set when you're ready." : "The beep repeats until you log the next set."}</p>
             <button type="button" class="rest-stop" data-action="rest-skip">Stop</button>
           </div>
@@ -5072,7 +5358,7 @@
         // push is the notification. Creating another one here is what shows up
         // the moment the phone is unlocked.
         if (!restSettings.push && typeof Notification !== "undefined" && Notification.permission === "granted") {
-          new Notification("Lift Log", { body: "Break is over bruh. Get back to work" });
+          new Notification("Lift Log", { body: restOverMessage() });
         }
       } catch {}
       if (!once) startRestBeeps();
@@ -5237,6 +5523,7 @@
       return out;
     }
     async function postRestAlert(body) {
+      if (demoMode) return { ok: true };
       if (!session) return { ok: false, error: "Not signed in." };
       try {
         const { data } = await sb.auth.getSession();
@@ -5277,6 +5564,7 @@
       return run;
     }
     function persistRestSession() {
+      if (demoMode) return;
       try {
         if (!restSession) localStorage.removeItem(REST_SESSION_KEY);
         else localStorage.setItem(REST_SESSION_KEY, JSON.stringify({
@@ -5319,6 +5607,7 @@
       } catch {}
     }
     async function turnPushOff(opts) {
+      if (demoMode) return;
       const quiet = !!(opts && opts.quiet);
       pushClosing = true;
       const epoch = ++pushEpoch;
@@ -5371,6 +5660,10 @@
       }
     }
     async function setPushAlerts(on, permissionPromise) {
+      if (demoMode) {
+        showToast("Lock-screen alerts stay off in demo mode.");
+        return;
+      }
       if (!on) return turnPushOff();
       const epoch = pushEpoch;
       const blocked = pushEnableBlocker();
