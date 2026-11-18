@@ -417,12 +417,12 @@
       width: 100%;
       min-width: 0;
       text-align: center;
-      font-size: 40px;
+      font-size: 48px;
       font-weight: 750;
       letter-spacing: -0.05em;
       font-variant-numeric: tabular-nums;
-      padding: 2px 0 4px;
-      height: 52px;
+      padding: 4px 8px;
+      height: 72px;
     }
     .step-row {
       display: flex;
@@ -606,6 +606,7 @@
       align-items: flex-end;
       justify-content: center;
     }
+    .sheet-scroll { max-height: 85vh; overflow: auto; }
     .sheet {
       width: 100%;
       max-width: 480px;
@@ -654,6 +655,13 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
+    }
+    .num-row .num-input {
+      min-height: 64px;
+      font-size: 32px;
+      font-weight: 750;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
     }
     .sheet-actions { display: flex; gap: 8px; margin-top: 4px; }
     .btn {
@@ -942,34 +950,47 @@
     .set-plan {
       display: flex;
       align-items: center;
-      gap: 6px;
-      min-height: 52px;
+      flex-wrap: wrap;
+      gap: 8px;
+      min-height: 64px;
       margin-top: 8px;
     }
-    .set-no { width: 48px; flex-shrink: 0; color: var(--muted); font-size: 13px; font-weight: 750; }
+    .set-no {
+      min-width: 52px;
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+      color: var(--muted);
+      font-size: 16px;
+      font-weight: 800;
+    }
     .set-plan.done .set-no { color: var(--good); }
     .plan-input {
-      width: 64px;
-      height: 44px;
+      flex: 1.2 1 88px;
+      min-width: 88px;
+      width: 88px;
+      height: 56px;
       text-align: center;
       background: var(--surface-2);
       border: 1px solid var(--line);
-      border-radius: 12px;
+      border-radius: 14px;
       font-weight: 750;
-      font-size: 18px;
+      font-size: 24px;
       font-variant-numeric: tabular-nums;
     }
-    .plan-input.reps { width: 52px; }
-    .plan-x { color: var(--muted); font-weight: 650; }
+    .plan-input.reps { flex: 0.9 1 72px; min-width: 72px; width: 72px; }
+    .plan-x { color: var(--muted); font-weight: 750; font-size: 20px; }
     .log-btn {
       margin-left: auto;
       min-width: 64px;
-      height: 44px;
-      padding: 0 12px;
-      border-radius: 12px;
+      height: 56px;
+      padding: 0 14px;
+      border-radius: 14px;
       background: var(--accent);
       color: var(--accent-ink);
       font-weight: 800;
+      font-size: 17px;
     }
     .log-btn:disabled { opacity: 0.35; }
     .done-mark { margin-left: auto; color: var(--good); font-weight: 750; }
@@ -1136,9 +1157,41 @@
       margin: 8px 0 12px;
       flex: none;
     }
-    .faq { padding: 0 4px 8px; }
-    .faq h3 { margin: 14px 0 4px; font-size: 15px; letter-spacing: -0.02em; }
-    .faq p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.45; }
+    .faq { padding: 0 0 8px; }
+    .faq-item { border-bottom: 1px solid var(--line); }
+    .faq-item:last-child { border-bottom: 0; }
+    .faq-q {
+      width: 100%;
+      min-height: 48px;
+      padding: 12px 4px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      text-align: left;
+      font-size: 15px;
+      font-weight: 750;
+      letter-spacing: -0.02em;
+    }
+    .faq-chev {
+      width: 8px;
+      height: 8px;
+      flex-shrink: 0;
+      border-right: 2px solid var(--muted);
+      border-bottom: 2px solid var(--muted);
+      transform: rotate(45deg) translateY(-2px);
+    }
+    .faq-q[aria-expanded="true"] .faq-chev { transform: rotate(-135deg) translateY(-2px); }
+    .faq-a { padding: 0 4px 14px; }
+    .faq-a p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.45; }
+    .app-version {
+      color: var(--faint);
+      font-size: 12px;
+      text-align: center;
+      margin: 14px 0 4px;
+    }
+    .whats-new { margin: 0 0 8px; padding-left: 18px; }
+    .whats-new li { margin: 0 0 8px; line-height: 1.4; }
     .tutorial {
       position: fixed;
       inset: 0;
@@ -1213,6 +1266,47 @@
     .fake-chart { height: 36px; border-radius: 8px; background: linear-gradient(90deg, var(--accent-dim), var(--accent)); }
     .lib-count { color: var(--muted); font-size: 12px; margin: 0 2px 8px; }
     .lib-group { margin-bottom: 8px; }
+    .lib-drop {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      margin: 0 0 8px;
+      overflow: hidden;
+    }
+    .lib-drop summary {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 48px;
+      padding: 12px 14px;
+      font-weight: 750;
+      cursor: pointer;
+      list-style: none;
+    }
+    .lib-drop summary::-webkit-details-marker { display: none; }
+    .lib-drop summary::after {
+      content: "";
+      width: 8px;
+      height: 8px;
+      flex-shrink: 0;
+      border-right: 2px solid var(--muted);
+      border-bottom: 2px solid var(--muted);
+      transform: rotate(45deg) translateY(-2px);
+    }
+    .lib-drop[open] summary::after { transform: rotate(-135deg) translateY(-2px); }
+    .lib-n { margin-left: auto; color: var(--muted); font-size: 13px; font-weight: 650; }
+    .lib-drop .ex-list { padding: 0 8px 8px; }
+    .lib-drop-list { display: flex; flex-direction: column; gap: 6px; padding: 0 8px 8px; }
+    .lib-drop-list button {
+      text-align: left;
+      min-height: 48px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      font-weight: 650;
+    }
+    .pick-list .lib-drop { background: var(--bg); }
     .pick-label { color: var(--muted); font-size: 11px; font-weight: 750; letter-spacing: 0.07em; text-transform: uppercase; margin: 4px 2px; }
     .resume-bar {
       width: 100%;
@@ -1601,6 +1695,21 @@
       ["yellow", "Yellow", "#eab308"]
     ];
     let themeChoice = { mode: "dark", accent: "orange" };
+    const APP_VERSION = "1.17";
+    const RELEASE_NOTES = [
+      {
+        version: "1.17",
+        date: "November 18, 2026",
+        items: [
+          "Weight, set, and rep boxes are larger and easier to tap.",
+          "Tap a weight or reps box and the number is highlighted, so typing replaces it.",
+          "Finishing a workout and deleting a set ask you to confirm first.",
+          "Past workouts in History can be edited. Change the weight and reps, or delete a set.",
+          "The exercise library is a menu grouped by equipment, and search still works.",
+          "Questions in Settings open one at a time."
+        ]
+      }
+    ];
     const TUTORIAL_KEY = "lift-log-tutorial-v1";
     const TUTORIAL_STEPS = [
       ["Workouts", "Start with Push, Pull, or Legs", "On Home, tap a workout card. After you finish, the next day moves to Pull, then Legs, then Push again.", "workouts"],
@@ -1613,6 +1722,7 @@
     ];
     let tutorialOpen = false;
     let tutorialStep = 0;
+    let faqOpen = {};
     let accountJustDeleted = false;
     let restSettings = { auto: true, sound: true, wake: true, push: false, seconds: 90, overrides: {} };
     let screenLock = null;
@@ -1624,6 +1734,7 @@
     let pushClosing = false;
     let pushStatus = "";
     let libQuery = "";
+    let libOpen = {};
     let progressQuery = "";
     let progressMetric = "weight";
     let progressRange = "all";
@@ -1889,6 +2000,33 @@
         showToast("Couldn't copy the link");
       }
     }
+    function selectField(input) {
+      if (!input) return;
+      const run = () => {
+        try { input.select(); } catch (err) {}
+        try { input.setSelectionRange(0, String(input.value || "").length); } catch (err) {}
+      };
+      let keep = false;
+      input.addEventListener("focus", () => {
+        keep = true;
+        run();
+        setTimeout(run, 0);
+        setTimeout(run, 20);
+      });
+      input.addEventListener("mouseup", (event) => {
+        if (!keep) return;
+        event.preventDefault();
+        keep = false;
+      });
+    }
+    function toastError(err, fallback) {
+      const msg = (err && err.message) || "";
+      if (/failed to fetch|network|offline|load failed/i.test(msg)) {
+        showToast("You're offline. Try again when you're back online.");
+        return;
+      }
+      showToast(msg || fallback);
+    }
     function showToast(msg) {
       toastMsg = msg;
       clearTimeout(toastTimer);
@@ -2005,7 +2143,10 @@
         loading = false;
         bootError = "";
         offerMigration();
+        if (brandNew) await markVersionSeen(APP_VERSION);
+        if (seq !== loadSeq) return;
         maybeOpenTutorial();
+        maybeShowWhatsNew();
         render();
         if (!restSettings.push) turnPushOff({ quiet: true });
       } catch (err) {
@@ -2532,6 +2673,7 @@
         </form>
         <div class="auth-links">${links}</div>
         ${mode === "forgot" ? "" : `<p class="privacy-note">Your workouts are saved privately to your account so they sync across devices. Other users can't see your data. We never sell or share it, and you can delete your account and all your data anytime in Settings.</p>`}
+        <p class="app-version">Version ${escapeHtml(APP_VERSION)}</p>
       </div></main>`;
     }
 
@@ -2828,7 +2970,10 @@
           const rows = day.sets.filter(s => s.exerciseId === id).map(s => `
             <div class="set-row">
               <div class="set-main">${escapeHtml(isBwSet(s.weightLbs) ? "BW" : fmtWeight(s.weightLbs, true))} <span>× ${s.reps}</span></div>
-              <button type="button" class="mini danger" data-action="history-delete-set" data-id="${escapeHtml(s.id)}" data-date="${escapeHtml(day.date)}" aria-label="Delete set">${trashIcon()}</button>
+              <div class="row-actions">
+                <button type="button" class="mini" data-action="edit-set" data-id="${escapeHtml(s.id)}" aria-label="Edit set">Edit</button>
+                <button type="button" class="mini danger" data-action="history-delete-set" data-id="${escapeHtml(s.id)}" data-date="${escapeHtml(day.date)}" aria-label="Delete set">${trashIcon()}</button>
+              </div>
             </div>`).join("");
           return `<section class="day-group">
             <div class="day-head"><button type="button" class="when title-link" data-go="#/progress/${encodeURIComponent(id)}">${escapeHtml(name)}</button></div>
@@ -3625,18 +3770,10 @@
               </div>
             </button>
           </div>
-          <div class="faq">
-            <h3>Why doesn't my iPhone vibrate?</h3>
-            <p>iPhones don't let a website vibrate. When rest ends you get a beep and a full-screen flash.</p>
-            <h3>Why is the beep silent?</h3>
-            <p>The silent switch mutes the beep. The flash still shows, and other music keeps playing. Turn Rest alert sound off if you only want the flash.</p>
-            <h3>How do I bring in old logs?</h3>
-            <p>If this phone still has logs from before accounts, signing in offers a one-time import. You can also use Import JSON above.</p>
-            <h3>How do I delete my account?</h3>
-            <p>Use Delete account below. Export a backup first if you want one, then type DELETE. That removes the account and every log.</p>
-          </div>
+          ${renderFaq()}
           <button type="button" class="btn danger delete-account" data-action="delete-account-open">Delete account</button>
           ${iosInstallTip()}
+          <p class="app-version">Version ${escapeHtml(APP_VERSION)}</p>
         </main>`;
     }
 
@@ -3667,6 +3804,90 @@
         </div>
       </div>`;
     }
+    const FAQ = [
+      ["vibrate", "Why doesn't my iPhone vibrate?", "iPhones don't let a website vibrate. When rest ends you get a beep and a full-screen flash."],
+      ["silent", "Why is the beep silent?", "The silent switch mutes the beep. The flash still shows, and other music keeps playing. Turn Rest alert sound off if you only want the flash."],
+      ["import", "How do I bring in old logs?", "If this phone still has logs from before accounts, signing in offers a one-time import. You can also use Import JSON above."],
+      ["delete", "How do I delete my account?", "Use Delete account below. Export a backup first if you want one, then type DELETE. That removes the account and every log."]
+    ];
+    function renderFaq() {
+      return `<div class="faq">${FAQ.map(([id, question, answer]) => {
+        const open = !!faqOpen[id];
+        return `<div class="faq-item">
+          <button type="button" class="faq-q" id="faq-btn-${id}" data-action="faq-toggle" data-id="${id}" aria-expanded="${open ? "true" : "false"}" aria-controls="faq-${id}">
+            <span>${escapeHtml(question)}</span><span class="faq-chev" aria-hidden="true"></span>
+          </button>
+          <div class="faq-a" id="faq-${id}" role="region" aria-labelledby="faq-btn-${id}" ${open ? "" : "hidden"}>
+            <p>${escapeHtml(answer)}</p>
+          </div>
+        </div>`;
+      }).join("")}</div>`;
+    }
+    function versionParts(value) {
+      return String(value || "0").split(".").map(part => {
+        const n = parseInt(part, 10);
+        return Number.isFinite(n) ? n : 0;
+      });
+    }
+    function versionNewer(a, b) {
+      const left = versionParts(a);
+      const right = versionParts(b);
+      const count = Math.max(left.length, right.length);
+      for (let i = 0; i < count; i++) {
+        const da = left[i] || 0;
+        const db = right[i] || 0;
+        if (da !== db) return da > db;
+      }
+      return false;
+    }
+    function seenVersionKey() {
+      const id = session && session.user ? session.user.id : "";
+      return "lift-log-seen-version:" + id;
+    }
+    function readSeenVersion() {
+      const meta = session && session.user && session.user.user_metadata
+        ? session.user.user_metadata.last_seen_version
+        : "";
+      let local = "";
+      try { local = localStorage.getItem(seenVersionKey()) || ""; } catch {}
+      const remote = meta ? String(meta) : "";
+      if (versionNewer(remote, local)) return remote;
+      return local || remote;
+    }
+    function pendingNotes() {
+      const seen = readSeenVersion();
+      return RELEASE_NOTES.filter(note => versionNewer(note.version, seen));
+    }
+    async function markVersionSeen(version) {
+      const next = version || APP_VERSION;
+      try { localStorage.setItem(seenVersionKey(), next); } catch {}
+      if (demoMode || !session || !sb || !sb.auth || typeof sb.auth.updateUser !== "function") return;
+      try {
+        const res = await sb.auth.updateUser({ data: { last_seen_version: next } });
+        const user = res && res.data && res.data.user;
+        if (res && !res.error && user) session.user = user;
+        else if (session.user) {
+          session.user.user_metadata = Object.assign({}, session.user.user_metadata || {}, { last_seen_version: next });
+        }
+      } catch {
+        if (session && session.user) {
+          session.user.user_metadata = Object.assign({}, session.user.user_metadata || {}, { last_seen_version: next });
+        }
+      }
+    }
+    function maybeShowWhatsNew() {
+      if (demoMode || tutorialOpen || !session || modal) return;
+      const notes = pendingNotes();
+      if (!notes.length) return;
+      modal = { type: "whats-new", notes };
+    }
+    function dismissWhatsNew() {
+      const notes = modal && modal.notes;
+      modal = null;
+      markVersionSeen(APP_VERSION);
+      render();
+      return notes;
+    }
     function tutorialSeen() {
       try { return localStorage.getItem(TUTORIAL_KEY) === "1"; } catch { return true; }
     }
@@ -3682,6 +3903,7 @@
     function closeTutorial() {
       tutorialOpen = false;
       markTutorialSeen();
+      maybeShowWhatsNew();
       render();
     }
     function tutorialNext() {
@@ -3695,6 +3917,54 @@
     }
     function renderModal() {
       if (!modal) return "";
+      if (modal.type === "whats-new") {
+        const notes = modal.notes || [];
+        const blocks = notes.map(note => `
+          <p class="hint">Version ${escapeHtml(note.version)} · ${escapeHtml(note.date)}</p>
+          <ul class="whats-new">${(note.items || []).map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`).join("");
+        return `<div class="overlay" data-action="close-modal">
+          <div class="sheet sheet-scroll" role="dialog" aria-modal="true" aria-labelledby="whats-new-title">
+            <div class="grab"></div>
+            <h2 id="whats-new-title">What's new</h2>
+            ${blocks}
+            <div class="sheet-actions">
+              <button type="button" class="btn primary" data-action="close-modal">Dismiss</button>
+            </div>
+          </div>
+        </div>`;
+      }
+      if (modal.type === "finish-workout") {
+        const name = activeWorkout ? activeWorkout.name : "this workout";
+        return `<div class="overlay" data-action="close-modal">
+          <div class="sheet" role="dialog" aria-modal="true" aria-label="Finish workout">
+            <div class="grab"></div>
+            <h2>Finish ${escapeHtml(name)}?</h2>
+            <p class="hint">Logged sets stay in History. You can edit the weight and reps later.</p>
+            <div class="sheet-actions">
+              <button type="button" class="btn ghost" data-action="close-modal">Cancel</button>
+              <button type="button" class="btn primary" data-action="finish-workout-go">Finish workout</button>
+            </div>
+          </div>
+        </div>`;
+      }
+      if (modal.type === "delete-set") {
+        const s = state.sets.find(x => x.id === modal.id);
+        const ex = s ? exerciseById(s.exerciseId) : null;
+        const detail = s
+          ? (ex ? ex.name + ": " : "") + (isBwSet(s.weightLbs) ? "BW" : fmtWeight(s.weightLbs, true)) + " × " + s.reps
+          : "This set";
+        return `<div class="overlay" data-action="close-modal">
+          <div class="sheet" role="dialog" aria-modal="true" aria-label="Delete set">
+            <div class="grab"></div>
+            <h2>Delete this set?</h2>
+            <p class="hint">${escapeHtml(detail)}. This can't be undone.</p>
+            <div class="sheet-actions">
+              <button type="button" class="btn ghost" data-action="close-modal" ${modal.busy ? "disabled" : ""}>Cancel</button>
+              <button type="button" class="btn danger" data-action="delete-set-confirm" ${modal.busy ? "disabled" : ""}>Delete set</button>
+            </div>
+          </div>
+        </div>`;
+      }
       if (modal.type === "delete-workout") {
         const n = modal.count || 0;
         return `<div class="overlay" data-action="close-modal">
@@ -4024,6 +4294,10 @@
       const dr = document.getElementById("draft-reps");
       if (dw) dw.addEventListener("input", () => { draft.weight = dw.value; });
       if (dr) dr.addEventListener("input", () => { draft.reps = dr.value; });
+      selectField(dw);
+      selectField(dr);
+      selectField(document.getElementById("edit-weight"));
+      selectField(document.getElementById("edit-reps"));
       document.querySelectorAll("[data-draft-weight]").forEach(input => {
         input.addEventListener("input", () => {
           const id = input.getAttribute("data-draft-weight");
@@ -4064,10 +4338,19 @@
         });
       }
       document.querySelectorAll("[data-plan-weight], [data-plan-reps]").forEach(input => {
+        selectField(input);
         input.addEventListener("input", () => {
           const id = input.getAttribute("data-plan-weight") || input.getAttribute("data-plan-reps");
           const index = input.getAttribute("data-index");
           readPlan(id, index);
+        });
+      });
+      document.querySelectorAll("details.lib-drop").forEach(node => {
+        node.addEventListener("toggle", () => {
+          const key = node.getAttribute("data-group");
+          if (!key) return;
+          if (node.open) libOpen[key] = true;
+          else delete libOpen[key];
         });
       });
 
@@ -4120,6 +4403,7 @@
     }
 
     function closeModal() {
+      if (modal && modal.type === "whats-new") return dismissWhatsNew();
       modal = null;
       render();
     }
@@ -4174,10 +4458,16 @@
         localStorage.setItem(migrationFlag(), "dismissed");
         modal = null;
         maybeOpenTutorial();
+        maybeShowWhatsNew();
         render();
         return;
       }
       if (action === "share-app") return shareLiftLog();
+      if (action === "faq-toggle") {
+        const id = el.getAttribute("data-id");
+        if (id) faqOpen[id] = !faqOpen[id];
+        return render();
+      }
       if (action === "show-tutorial") {
         tutorialOpen = true;
         tutorialStep = 0;
@@ -4240,7 +4530,11 @@
         return render();
       }
       if (action === "save-set") return saveSetEdit();
-      if (action === "delete-set") return deleteSet(el.getAttribute("data-id"));
+      if (action === "delete-set") {
+        modal = { type: "delete-set", id: el.getAttribute("data-id"), date: "" };
+        return render();
+      }
+      if (action === "delete-set-confirm") return confirmDeleteSet();
       if (action === "set-unit") return setUnit(el.getAttribute("data-unit"));
       if (action === "set-theme") return setThemeMode(el.getAttribute("data-mode"));
       if (action === "set-accent") return setAccent(el.getAttribute("data-accent"));
@@ -4309,7 +4603,16 @@
       if (action === "delete-template") return deleteTemplate(el.getAttribute("data-id"));
       if (action === "wo-step-w" || action === "wo-step-r") return stepWorkout(action, el);
       if (action === "wo-add-set") return addWorkoutSet(el.getAttribute("data-id"));
-      if (action === "finish-workout") return finishWorkout();
+      if (action === "finish-workout") {
+        if (!activeWorkout) return go("#/");
+        modal = { type: "finish-workout" };
+        return render();
+      }
+      if (action === "finish-workout-go") {
+        modal = null;
+        render();
+        return finishWorkout();
+      }
       if (action === "history-more") { historyShown += 12; render(); return; }
       if (action === "cal-month") return shiftHistoryMonth(Number(el.getAttribute("data-dir")));
       if (action === "cal-day") return openHistoryDay(el.getAttribute("data-date"));
@@ -4319,7 +4622,10 @@
         return render();
       }
       if (action === "history-delete-confirm") return deleteWorkout();
-      if (action === "history-delete-set") return deleteHistorySet(el.getAttribute("data-id"), el.getAttribute("data-date"));
+      if (action === "history-delete-set") {
+        modal = { type: "delete-set", id: el.getAttribute("data-id"), date: el.getAttribute("data-date") || "" };
+        return render();
+      }
     }
 
     async function submitAuth() {
@@ -4557,12 +4863,20 @@
       } catch (err) {
         s.weightLbs = prevW;
         s.reps = prevR;
-        showToast(err.message || "Couldn't update that set.");
+        toastError(err, "Couldn't update that set.");
       } finally {
         saving = false;
       }
     }
 
+    async function confirmDeleteSet() {
+      if (!modal || modal.type !== "delete-set" || modal.busy || saving) return;
+      const id = modal.id;
+      const date = modal.date || "";
+      modal = null;
+      render();
+      await deleteHistorySet(id, date);
+    }
     async function deleteSet(id) {
       if (saving) return;
       const backup = state.sets.slice();
@@ -4574,7 +4888,7 @@
         showToast("Set deleted");
       } catch (err) {
         state.sets = backup;
-        showToast(err.message || "Couldn't delete that set.");
+        toastError(err, "Couldn't delete that set.");
       } finally {
         saving = false;
       }
@@ -6280,11 +6594,17 @@
         .sort((a, b) => a.name.localeCompare(b.name));
       const list = picks.map(e => `<button type="button" data-action="tpl-add-existing" data-name="${escapeHtml(e.name)}">${escapeHtml(e.name)}</button>`).join("");
       const owned = new Set(state.exercises.map(e => e.name.toLowerCase()));
-      const libHits = query ? LIBRARY.filter(e => {
+      const libHits = LIBRARY.filter(e => {
         const key = e.name.toLowerCase();
-        return key.indexOf(query) !== -1 && !exclude.has(key) && !owned.has(key);
-      }).slice(0, 30) : [];
-      const libList = libHits.map(e => `<button type="button" data-action="tpl-add-library" data-name="${escapeHtml(e.name)}">${escapeHtml(e.name)} <span style="color:var(--muted);font-weight:500">· ${escapeHtml(e.equipment)}</span></button>`).join("");
+        if (exclude.has(key) || owned.has(key)) return false;
+        if (query && key.indexOf(query) === -1) return false;
+        return true;
+      });
+      const libList = libraryMenus(libHits, {
+        prefix: "pick:",
+        force: !!query,
+        button: (e) => `<button type="button" data-action="tpl-add-library" data-name="${escapeHtml(e.name)}">${escapeHtml(e.name)}</button>`
+      });
       const also = workoutMode
         ? `<label class="also-save"><input type="checkbox" id="also-save-template" ${modal.alsoSave ? "checked" : ""}><span>Also save to template</span></label>`
         : "";
@@ -6297,7 +6617,8 @@
           <div class="pick-list">
             <div class="pick-label">Yours</div>
             ${list || `<div class="picker-empty">${query ? "No matches in your list." : "No other exercises yet."}</div>`}
-            ${query ? `<div class="pick-label">Library</div>${libList || `<div class="picker-empty">No library matches.</div>`}` : `<div class="picker-empty">Search to add from the gym library.</div>`}
+            <div class="pick-label">Library</div>
+            ${libList || `<div class="picker-empty">${query ? "No library matches." : "Nothing left to add from the library."}</div>`}
           </div>
           ${also}
           <label class="field-lbl" for="tpl-add-name">Create new exercise</label>
@@ -6383,6 +6704,22 @@
       if (!key) return null;
       return LIBRARY.find(e => e.name.toLowerCase() === key) || null;
     }
+    function libraryMenus(matches, opts) {
+      const prefix = opts.prefix || "";
+      const force = !!opts.force;
+      return EQUIPMENT.map(eq => {
+        const rows = matches.filter(e => e.equipment === eq);
+        if (!rows.length) return "";
+        const key = prefix + eq;
+        const open = force || !!libOpen[key];
+        const buttons = rows.map(opts.button).join("");
+        const listClass = opts.listClass || "lib-drop-list";
+        return `<details class="lib-drop" data-group="${escapeHtml(key)}"${open ? " open" : ""}>
+          <summary><span>${escapeHtml(eq)}</span><span class="lib-n">${rows.length}</span></summary>
+          <div class="${listClass}">${buttons}</div>
+        </details>`;
+      }).join("");
+    }
     function renderLibrary() {
       const q = libQuery.trim().toLowerCase();
       const matches = LIBRARY.filter(e => {
@@ -6397,18 +6734,17 @@
       const muscleChips = ["All"].concat(MUSCLES).map(name =>
         `<button type="button" class="chip${libMuscle === name ? " on" : ""}" data-action="lib-muscle" data-value="${escapeHtml(name)}">${escapeHtml(name)}</button>`
       ).join("");
-      const groups = [];
-      EQUIPMENT.forEach(eq => {
-        const rows = matches.filter(e => e.equipment === eq);
-        if (!rows.length) return;
-        const buttons = rows.map(e => {
+      const groups = libraryMenus(matches, {
+        prefix: "lib:",
+        force: !!q,
+        listClass: "ex-list",
+        button: (e) => {
           const owned = state.exercises.some(x => x.name.toLowerCase() === e.name.toLowerCase());
           return `<button type="button" class="ex-row" data-action="add-library" data-name="${escapeHtml(e.name)}">
             <span class="meta"><span class="name">${escapeHtml(e.name)}</span><span class="last">${escapeHtml(e.muscle)}</span></span>
             <span class="chev">${owned ? "Added" : "Add"}</span>
           </button>`;
-        }).join("");
-        groups.push(`<section class="lib-group"><div class="eyebrow">${escapeHtml(eq)}</div><div class="ex-list">${buttons}</div></section>`);
+        }
       });
       return `<header class="topbar">
           <button class="icon-btn" data-go="#/" aria-label="Back">${backIcon()}</button>
@@ -6420,7 +6756,7 @@
           <div class="chip-row" aria-label="Equipment">${equipChips}</div>
           <div class="chip-row" aria-label="Muscle group">${muscleChips}</div>
           <div class="lib-count">${matches.length} exercise${matches.length === 1 ? "" : "s"}</div>
-          ${groups.join("") || `<div class="empty">No exercises match.</div>`}
+          ${groups || `<div class="empty">No exercises match.</div>`}
         </main>`;
     }
     async function addFromLibrary(name) {
