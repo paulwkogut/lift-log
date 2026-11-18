@@ -4323,7 +4323,7 @@
           </div>
         </div>`;
       }
-      if (modal.type === "add-template-exercise" || modal.type === "add-workout-exercise") {
+      if (modal.type === "add-template-exercise" || modal.type === "add-workout-exercise" || modal.type === "add-history-exercise") {
         return renderExercisePicker();
       }
       if (modal.type === "add-exercise" || modal.type === "rename-exercise") {
@@ -4663,9 +4663,11 @@
       document.querySelectorAll("details.lib-browse").forEach(node => {
         node.addEventListener("toggle", () => {
           const which = node.getAttribute("data-browse");
-          if (which === "home") homeLibOpen = node.open;
-          else if (which === "page") libBrowseOpen = node.open;
-          else if (modal) modal.browseOpen = node.open;
+          let was = false;
+          if (which === "home") { was = homeLibOpen; homeLibOpen = node.open; }
+          else if (which === "page") { was = libBrowseOpen; libBrowseOpen = node.open; }
+          else if (modal) { was = !!modal.browseOpen; modal.browseOpen = node.open; }
+          if (node.open !== was) render();
         });
       });
       document.querySelectorAll("[data-hist-weight], [data-hist-reps]").forEach(input => {
@@ -6973,12 +6975,13 @@
         .filter(e => !query || e.name.toLowerCase().indexOf(query) !== -1)
         .sort((a, b) => a.name.localeCompare(b.name));
       const list = picks.map(e => `<button type="button" data-action="tpl-add-existing" data-name="${escapeHtml(e.name)}">${escapeHtml(e.name)}</button>`).join("");
-      const libHits = catalogMatches(query).filter(e => !exclude.has(e.name.toLowerCase()));
-      const libList = libraryMenus(libHits, {
+      const showLib = !!(query || modal.browseOpen);
+      const libHits = showLib ? catalogMatches(query).filter(e => !exclude.has(e.name.toLowerCase())) : [];
+      const libList = showLib ? libraryMenus(libHits, {
         prefix: "pick:",
         force: !!query,
         button: (e) => `<button type="button" data-action="library-open" data-name="${escapeHtml(e.name)}">${escapeHtml(e.name)}</button>`
-      });
+      }) : "";
       const also = workoutMode
         ? `<label class="also-save"><input type="checkbox" id="also-save-template" ${modal.alsoSave ? "checked" : ""}><span>Also save to template</span></label>`
         : "";
@@ -7103,7 +7106,7 @@
       return catalog && catalog.length ? catalog : LIBRARY;
     }
     function ensureCatalog() {
-      if (catalog || catalogLoading) return;
+      if (catalog || catalogLoading || catalogError) return;
       catalogLoading = true;
       fetch("library.json").then(res => {
         if (!res.ok) throw new Error("library");
@@ -7172,12 +7175,16 @@
     }
     function libraryBrowserBody() {
       const q = libQuery.trim().toLowerCase();
-      const matches = catalogList().filter(e => {
+      let matches = catalogList().filter(e => {
         if (libEquip !== "All" && e.equipment !== libEquip) return false;
         if (libMuscle !== "All" && e.muscle !== libMuscle) return false;
-        if (!q) return true;
-        return catalogMatches(q).some(hit => hit.name === e.name);
+        return true;
       });
+      if (q) {
+        const allowed = {};
+        catalogMatches(q).forEach(hit => { allowed[hit.name] = true; });
+        matches = matches.filter(e => allowed[e.name]);
+      }
       const equipChips = ["All"].concat(EQUIPMENT).map(name =>
         `<button type="button" class="chip${libEquip === name ? " on" : ""}" data-action="lib-equip" data-value="${escapeHtml(name)}">${escapeHtml(name)}</button>`
       ).join("");
@@ -7213,7 +7220,7 @@
       const open = (which === "home" ? homeLibOpen : libBrowseOpen) || !!q;
       return `<details class="lib-browse" data-browse="${which}"${open ? " open" : ""}>
         <summary>Browse library</summary>
-        <div class="lib-browse-body">${libraryBrowserBody()}</div>
+        <div class="lib-browse-body">${open ? libraryBrowserBody() : ""}</div>
       </details>`;
     }
     function renderLibraryDetail() {
