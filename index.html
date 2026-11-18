@@ -1095,6 +1095,75 @@
       color: var(--accent-2);
       font-weight: 750;
     }
+    .lib-browse {
+      background: var(--surface);
+      border: 1px solid var(--accent);
+      border-radius: 16px;
+      margin: 0 0 10px;
+      overflow: hidden;
+    }
+    .lib-browse > summary {
+      min-height: 52px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-weight: 750;
+      color: var(--accent-2);
+      background: var(--accent-dim);
+      list-style: none;
+      cursor: pointer;
+    }
+    .lib-browse > summary::-webkit-details-marker { display: none; }
+    .lib-browse > summary::after {
+      content: "";
+      width: 8px;
+      height: 8px;
+      flex-shrink: 0;
+      border-right: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      transform: rotate(45deg) translateY(-2px);
+    }
+    .lib-browse[open] > summary::after { transform: rotate(-135deg) translateY(-2px); }
+    .lib-browse-body { padding: 10px 10px 4px; }
+    .lib-entry { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .lib-entry .ex-row { flex: 1; min-width: 0; margin: 0; }
+    .photo-row { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; flex-wrap: wrap; }
+    .photo-thumb {
+      width: 72px;
+      height: 72px;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: var(--surface-2);
+      padding: 0;
+      flex-shrink: 0;
+    }
+    .photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .photo-view { width: 100%; max-height: 70vh; object-fit: contain; border-radius: 16px; background: #000; }
+    .photo-file {
+      position: relative;
+      min-height: 48px;
+      min-width: 48px;
+      padding: 0 14px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: var(--surface-2);
+      font-weight: 750;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .photo-file input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+    }
+    .photo-note { color: var(--muted); font-size: 13px; }
     .chip-row {
       display: flex;
       gap: 6px;
@@ -1695,8 +1764,18 @@
       ["yellow", "Yellow", "#eab308"]
     ];
     let themeChoice = { mode: "dark", accent: "orange" };
-    const APP_VERSION = "1.17";
+    const APP_VERSION = "1.18";
     const RELEASE_NOTES = [
+      {
+        version: "1.18",
+        date: "November 18, 2026",
+        items: [
+          "Edit a finished workout: add or remove sets, change the weight and reps, and add an exercise.",
+          "Adding an exercise to a template workout also adds it to that template.",
+          "Browse library stays closed until you tap it. It includes hundreds of exercises with photos and instructions, grouped by equipment.",
+          "Add your own photo of an exercise or machine. That photo stays private and replaces the stock picture. An admin can set a photo everyone sees."
+        ]
+      },
       {
         version: "1.17",
         date: "November 18, 2026",
@@ -1743,6 +1822,18 @@
     let historyShown = 12;
     let historyCursor = null;
     let historyFocus = "";
+    let historyExtra = {};
+    let historyDrafts = {};
+    let homeLibOpen = false;
+    let libBrowseOpen = false;
+    let photoColumn = true;
+    let photoUrls = {};
+    let photoPending = {};
+    let photoFailed = {};
+    let libraryPhotos = {};
+    let catalog = null;
+    let catalogLoading = false;
+    let catalogError = false;
     let historyDidSwipe = false;
     let demoMode = false;
     let demoBackup = null;
@@ -2050,6 +2141,7 @@
           id: ex.id,
           name: ex.name,
           custom: !!ex.custom,
+          photoPath: ex.photo_path || "",
           createdAt: ex.created_at ? new Date(ex.created_at).getTime() : Date.now()
         })),
         sets: (sets || []).map(s => ({
@@ -2065,8 +2157,12 @@
     }
 
     async function fetchAll() {
-      const [exRes, setRes, settingsRes] = await Promise.all([
-        sb.from("exercises").select("id,name,custom,created_at").order("created_at", { ascending: true }),
+      let exRes = await sb.from("exercises").select("id,name,custom,created_at,photo_path").order("created_at", { ascending: true });
+      if (exRes.error && isMissingColumn(exRes.error)) {
+        photoColumn = false;
+        exRes = await sb.from("exercises").select("id,name,custom,created_at").order("created_at", { ascending: true });
+      } else if (!exRes.error) photoColumn = true;
+      const [setRes, settingsRes] = await Promise.all([
         sb.from("sets").select("id,exercise_id,weight,reps,unit,performed_at").order("performed_at", { ascending: true }),
         sb.from("user_settings").select("unit,rest_message").maybeSingle()
       ]);
@@ -2143,6 +2239,7 @@
         loading = false;
         bootError = "";
         offerMigration();
+        try { await loadLibraryPhotos(); } catch (err) {}
         if (brandNew) await markVersionSeen(APP_VERSION);
         if (seq !== loadSeq) return;
         maybeOpenTutorial();
@@ -2485,7 +2582,7 @@
       const activePos = active && typeof active.selectionStart === "number" ? [active.selectionStart, active.selectionEnd] : null;
       const screen = screenName();
       appEl.dataset.screen = screen;
-      if (screen === "settings" || screen === "admin" || screen === "admin-feedback") ensureAdminStats();
+      if (screen === "settings" || screen === "admin" || screen === "admin-feedback" || screen === "library" || screen === "exercise" || screen === "home") ensureAdminStats();
       if (screen === "admin-feedback") loadAdminFeedback();
 
       let html = "";
@@ -2918,7 +3015,7 @@
           exerciseIds,
           volume,
           duration: formatDuration(ordered),
-          templateName: templateNameForDay(date, ordered)
+          templateName: templateNameForDay(date, ordered) || ((templateForHistoryDay({ date: date, exerciseIds: exerciseIds }) || {}).name || "")
         };
       }).sort((a, b) => a.date < b.date ? 1 : -1);
     }
@@ -2953,6 +3050,85 @@
         loadAccount();
       }
     }
+    function dayTemplateStore() {
+      try { return JSON.parse(localStorage.getItem("lift-log-day-template-v1") || "{}"); } catch (err) { return {}; }
+    }
+    function savedDayTemplate(date) {
+      const user = session && session.user ? session.user.id : "";
+      const map = (dayTemplateStore()[user] || {});
+      return map[date] || "";
+    }
+    function rememberDayTemplate(date, templateId) {
+      if (demoMode || !date || !templateId) return;
+      const user = session && session.user ? session.user.id : "";
+      if (!user) return;
+      const all = dayTemplateStore();
+      if (!all[user]) all[user] = {};
+      all[user][date] = templateId;
+      try { localStorage.setItem("lift-log-day-template-v1", JSON.stringify(all)); } catch (err) {}
+    }
+    function noteWorkoutTemplate() {
+      if (!activeWorkout || !activeWorkout.templateId) return;
+      rememberDayTemplate(todayKey(activeWorkout.startedAt || Date.now()), activeWorkout.templateId);
+      rememberDayTemplate(todayKey(Date.now()), activeWorkout.templateId);
+    }
+    function templateForHistoryDay(day) {
+      if (!day) return null;
+      const savedId = savedDayTemplate(day.date);
+      if (savedId && templateById(savedId)) return templateById(savedId);
+      if (activeWorkout && activeWorkout.templateId && todayKey(activeWorkout.startedAt) === day.date && templateById(activeWorkout.templateId)) {
+        return templateById(activeWorkout.templateId);
+      }
+      const names = (day.exerciseIds || []).map(id => {
+        const ex = exerciseById(id);
+        return ex ? ex.name.toLowerCase() : "";
+      }).filter(Boolean);
+      if (!names.length) return null;
+      let best = null;
+      let bestScore = -1;
+      let ties = 0;
+      (state.templates || []).forEach(t => {
+        const tnames = (t.exerciseNames || []).map(n => String(n).toLowerCase());
+        if (!tnames.length) return;
+        const overlap = names.filter(n => tnames.indexOf(n) !== -1).length;
+        if (!overlap) return;
+        const allIn = names.every(n => tnames.indexOf(n) !== -1);
+        const score = overlap * 10 + (allIn ? 5 : 0);
+        if (score > bestScore) { best = t; bestScore = score; ties = 1; }
+        else if (score === bestScore) ties += 1;
+      });
+      if (ties !== 1 || !best) return null;
+      const tnames = best.exerciseNames.map(n => String(n).toLowerCase());
+      if (!names.every(n => tnames.indexOf(n) !== -1)) return null;
+      return best;
+    }
+    function timeOnDay(dateKey) {
+      const parts = String(dateKey || "").split("-").map(Number);
+      const sets = state.sets.filter(s => todayKey(s.createdAt) === dateKey);
+      if (sets.length) {
+        const last = Math.max.apply(null, sets.map(s => s.createdAt));
+        const next = last + 1000;
+        if (todayKey(next) === dateKey) return next;
+        return last;
+      }
+      return new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1, 12, 0, 0, 0).getTime();
+    }
+    function historyExerciseIds(day) {
+      const extra = (historyExtra[day.date] || []).filter(id => day.exerciseIds.indexOf(id) === -1 && exerciseById(id));
+      return day.exerciseIds.concat(extra);
+    }
+    function historyDraft(date, id) {
+      const key = date + ":" + id;
+      if (!historyDrafts[key]) {
+        const last = lastSet(id);
+        const ex = exerciseById(id);
+        historyDrafts[key] = {
+          weight: last ? fmtWeight(last.weightLbs, false) : startingWeight(ex && ex.name),
+          reps: last ? String(last.reps) : "5"
+        };
+      }
+      return historyDrafts[key];
+    }
     function renderHistory() {
       const days = workoutHistory();
       if (route.id) {
@@ -2964,9 +3140,11 @@
           </header>
           <main class="screen"><div class="empty">That workout is gone.</div></main>`;
         }
-        const blocks = day.exerciseIds.map(id => {
+        const template = templateForHistoryDay(day);
+        const blocks = historyExerciseIds(day).map(id => {
           const ex = exerciseById(id);
           const name = ex ? ex.name : "Missing exercise";
+          const draft = historyDraft(day.date, id);
           const rows = day.sets.filter(s => s.exerciseId === id).map(s => `
             <div class="set-row">
               <div class="set-main">${escapeHtml(isBwSet(s.weightLbs) ? "BW" : fmtWeight(s.weightLbs, true))} <span>× ${s.reps}</span></div>
@@ -2977,10 +3155,17 @@
             </div>`).join("");
           return `<section class="day-group">
             <div class="day-head"><button type="button" class="when title-link" data-go="#/progress/${encodeURIComponent(id)}">${escapeHtml(name)}</button></div>
-            ${rows}
+            ${rows || `<div class="empty">No sets yet.</div>`}
+            <div class="set-plan">
+              <input class="plan-input" data-hist-weight="${escapeHtml(id)}" data-date="${escapeHtml(day.date)}" inputmode="decimal" type="text" value="${escapeHtml(draft.weight)}" aria-label="Weight for ${escapeHtml(name)}">
+              <span class="plan-x">×</span>
+              <input class="plan-input reps" data-hist-reps="${escapeHtml(id)}" data-date="${escapeHtml(day.date)}" inputmode="numeric" type="text" value="${escapeHtml(draft.reps)}" aria-label="Reps for ${escapeHtml(name)}">
+              <button type="button" class="log-btn" data-action="history-add-set" data-id="${escapeHtml(id)}" data-date="${escapeHtml(day.date)}">Add set</button>
+            </div>
           </section>`;
         }).join("");
-        const bits = [day.exerciseIds.length + " exercise" + (day.exerciseIds.length === 1 ? "" : "s"), day.sets.length + " set" + (day.sets.length === 1 ? "" : "s"), volumeLabel(day)];
+        const shownIds = historyExerciseIds(day);
+        const bits = [shownIds.length + " exercise" + (shownIds.length === 1 ? "" : "s"), day.sets.length + " set" + (day.sets.length === 1 ? "" : "s"), volumeLabel(day)];
         if (day.duration) bits.push(day.duration);
         return `<header class="topbar">
             <button class="icon-btn" data-go="#/history" aria-label="Back">${backIcon()}</button>
@@ -2989,7 +3174,9 @@
           <main class="screen">
             ${day.templateName ? `<div class="eyebrow">${escapeHtml(day.templateName)}</div>` : ""}
             <p class="wo-progress">${escapeHtml(bits.join(" · "))}</p>
+            ${template ? `<p class="hint">Adding an exercise also adds it to ${escapeHtml(template.name)}.</p>` : ""}
             ${blocks}
+            <button type="button" class="add-ex" data-action="history-add-open" data-date="${escapeHtml(day.date)}">+ Add exercise</button>
             <button type="button" class="btn danger delete-account" data-action="history-delete-open" data-date="${escapeHtml(day.date)}">Delete workout</button>
           </main>`;
       }
@@ -3016,6 +3203,86 @@
         </main>`;
     }
 
+    async function addHistorySet(exId, date) {
+      if (saving || !exId || !date) return;
+      const key = date + ":" + exId;
+      const weightEl = document.querySelector('[data-hist-weight="' + exId + '"]');
+      const repsEl = document.querySelector('[data-hist-reps="' + exId + '"]');
+      const draft = historyDrafts[key] || { weight: "", reps: "" };
+      if (weightEl) draft.weight = weightEl.value;
+      if (repsEl) draft.reps = repsEl.value;
+      historyDrafts[key] = draft;
+      const w = parseWeight(draft.weight);
+      const r = parseReps(draft.reps);
+      if (w == null) { showToast("Enter a valid weight"); return; }
+      if (r == null) { showToast("Enter at least 1 rep"); return; }
+      const row = {
+        id: uid(),
+        exerciseId: exId,
+        weightLbs: toLbs(w),
+        reps: r,
+        createdAt: timeOnDay(date)
+      };
+      state.sets.push(row);
+      saving = true;
+      try {
+        await persistSetInsert(row, w);
+        if (historyExtra[date]) historyExtra[date] = historyExtra[date].filter(id => id !== exId);
+        showToast("Set added");
+      } catch (err) {
+        state.sets = state.sets.filter(s => s.id !== row.id);
+        toastError(err, "Couldn't add that set.");
+      } finally {
+        saving = false;
+      }
+    }
+    async function addHistoryExercise(name) {
+      if (!modal || !modal.date) return;
+      if (modal.type !== "add-history-exercise" && modal.type !== "library-detail") return;
+      const date = modal.date;
+      const clean = String(name || "").trim();
+      if (!clean) { showToast("Type an exercise name"); return; }
+      const day = workoutHistory().find(item => item.date === date) || { date: date, exerciseIds: [], sets: [] };
+      const taken = historyExerciseIds(day).some(id => {
+        const ex = exerciseById(id);
+        return ex && ex.name.toLowerCase() === clean.toLowerCase();
+      });
+      if (taken) { showToast("Already in this workout"); return; }
+      const existed = state.exercises.some(e => e.name.toLowerCase() === clean.toLowerCase());
+      let created = null;
+      try {
+        const ex = await ensureExercise(clean, true);
+        if (!existed) created = ex;
+        const template = templateForHistoryDay(day);
+        let addedToTemplate = false;
+        if (template && !(template.exerciseNames || []).some(n => String(n).toLowerCase() === ex.name.toLowerCase())) {
+          const prevNames = template.exerciseNames.slice();
+          const prevTargets = (template.targets || []).slice();
+          ensureTargets(template);
+          template.exerciseNames = template.exerciseNames.concat(ex.name);
+          template.targets = template.targets.concat([defaultTarget()]);
+          try {
+            await saveTemplateRecord(template);
+            addedToTemplate = true;
+          } catch (err) {
+            template.exerciseNames = prevNames;
+            template.targets = prevTargets;
+            if (created) {
+              state.exercises = state.exercises.filter(e => e.id !== created.id);
+              try { await persistExerciseDelete(created.id); } catch (ignore) {}
+            }
+            toastError(err, "Couldn't add that exercise.");
+            return;
+          }
+        }
+        if (!historyExtra[date]) historyExtra[date] = [];
+        if (historyExtra[date].indexOf(ex.id) < 0) historyExtra[date].push(ex.id);
+        modal = null;
+        showToast(addedToTemplate ? "Added to this workout and the template" : "Added to this workout");
+      } catch (err) {
+        toastError(err, "Couldn't add that exercise.");
+      }
+    }
     function shiftHistoryMonth(dir) {
       const now = new Date();
       if (!historyCursor) historyCursor = { y: now.getFullYear(), m: now.getMonth() };
@@ -3130,7 +3397,7 @@
           <div class="eyebrow">Exercises</div>
           <button type="button" class="browse-lib" data-go="#/progress">Progress</button>
           <button type="button" class="browse-lib" data-go="#/history">Workout history</button>
-          <button type="button" class="browse-lib" data-action="open-library">Browse library</button>
+          ${renderBrowseLibrary("home")}
           <div class="ex-list">${rows || `<div class="empty">No exercises yet. Add one to start logging.</div>`}</div>
           <div class="add-ex-wrap">
             <button class="add-ex" data-action="add-exercise">+ Add exercise</button>
@@ -3191,6 +3458,7 @@
           <button class="icon-btn" data-action="ex-menu" aria-label="Exercise options">${dotsIcon()}</button>
         </header>
         <main class="screen">
+          ${photoEditor(ex)}
           <div class="pr-grid">
             <div class="pr-card">
               <div class="lbl">Heaviest</div>
@@ -3808,7 +4076,8 @@
       ["vibrate", "Why doesn't my iPhone vibrate?", "iPhones don't let a website vibrate. When rest ends you get a beep and a full-screen flash."],
       ["silent", "Why is the beep silent?", "The silent switch mutes the beep. The flash still shows, and other music keeps playing. Turn Rest alert sound off if you only want the flash."],
       ["import", "How do I bring in old logs?", "If this phone still has logs from before accounts, signing in offers a one-time import. You can also use Import JSON above."],
-      ["delete", "How do I delete my account?", "Use Delete account below. Export a backup first if you want one, then type DELETE. That removes the account and every log."]
+      ["delete", "How do I delete my account?", "Use Delete account below. Export a backup first if you want one, then type DELETE. That removes the account and every log."],
+      ["credit", "Where do the exercise photos come from?", "Exercise data and images from free-exercise-db (public domain)."]
     ];
     function renderFaq() {
       return `<div class="faq">${FAQ.map(([id, question, answer]) => {
@@ -3929,6 +4198,44 @@
             ${blocks}
             <div class="sheet-actions">
               <button type="button" class="btn primary" data-action="close-modal">Dismiss</button>
+            </div>
+          </div>
+        </div>`;
+      }
+      if (modal.type === "library-detail") return renderLibraryDetail();
+      if (modal.type === "photo-view") {
+        const src = modal.src || photoUrls[modal.path] || "";
+        return `<div class="overlay" data-action="close-modal">
+          <div class="sheet sheet-scroll" role="dialog" aria-modal="true" aria-label="Exercise photo">
+            <div class="grab"></div>
+            <h2>Photo</h2>
+            ${src ? `<img class="photo-view" src="${escapeHtml(src)}" alt="">` : `<p class="hint">That photo isn't available.</p>`}
+            <div class="sheet-actions"><button type="button" class="btn ghost" data-action="close-modal">Close</button></div>
+          </div>
+        </div>`;
+      }
+      if (modal.type === "photo-default") {
+        return `<div class="overlay" data-action="close-modal">
+          <div class="sheet" role="dialog" aria-modal="true" aria-label="Use default photo">
+            <div class="grab"></div>
+            <h2>Use the default photo?</h2>
+            <p class="hint">Your photo is removed. The stock or shared photo shows again.</p>
+            <div class="sheet-actions">
+              <button type="button" class="btn ghost" data-action="close-modal">Cancel</button>
+              <button type="button" class="btn danger" data-action="photo-default-go">Use default photo</button>
+            </div>
+          </div>
+        </div>`;
+      }
+      if (modal.type === "delete-photo") {
+        return `<div class="overlay" data-action="close-modal">
+          <div class="sheet" role="dialog" aria-modal="true" aria-label="Remove shared photo">
+            <div class="grab"></div>
+            <h2>Remove the shared photo?</h2>
+            <p class="hint">Everyone will see the stock photo again, unless they set their own.</p>
+            <div class="sheet-actions">
+              <button type="button" class="btn ghost" data-action="close-modal">Cancel</button>
+              <button type="button" class="btn danger" data-action="photo-delete-go">Remove photo</button>
             </div>
           </div>
         </div>`;
@@ -4353,6 +4660,35 @@
           else delete libOpen[key];
         });
       });
+      document.querySelectorAll("details.lib-browse").forEach(node => {
+        node.addEventListener("toggle", () => {
+          const which = node.getAttribute("data-browse");
+          if (which === "home") homeLibOpen = node.open;
+          else if (which === "page") libBrowseOpen = node.open;
+          else if (modal) modal.browseOpen = node.open;
+        });
+      });
+      document.querySelectorAll("[data-hist-weight], [data-hist-reps]").forEach(input => {
+        selectField(input);
+        input.addEventListener("input", () => {
+          const id = input.getAttribute("data-hist-weight") || input.getAttribute("data-hist-reps");
+          const date = input.getAttribute("data-date");
+          const key = date + ":" + id;
+          if (!historyDrafts[key]) historyDrafts[key] = { weight: "", reps: "" };
+          if (input.hasAttribute("data-hist-weight")) historyDrafts[key].weight = input.value;
+          else historyDrafts[key].reps = input.value;
+        });
+      });
+      document.querySelectorAll("input[data-photo]").forEach(input => {
+        input.addEventListener("change", () => {
+          const file = input.files && input.files[0];
+          input.value = "";
+          if (file) uploadPhoto(input.getAttribute("data-photo"), file, {
+            id: input.getAttribute("data-id") || "",
+            name: input.getAttribute("data-name") || ""
+          });
+        });
+      });
 
       const authFormEl = document.getElementById("auth-form");
       if (authFormEl) authFormEl.addEventListener("submit", (e) => {
@@ -4622,6 +4958,38 @@
         return render();
       }
       if (action === "history-delete-confirm") return deleteWorkout();
+      if (action === "history-add-open") {
+        modal = { type: "add-history-exercise", date: el.getAttribute("data-date"), value: "", query: "", browseOpen: false };
+        ensureCatalog();
+        return render();
+      }
+      if (action === "history-add-set") return addHistorySet(el.getAttribute("data-id"), el.getAttribute("data-date"));
+      if (action === "library-open") {
+        const date = modal && modal.type === "add-history-exercise" ? modal.date : "";
+        const templateId = modal && modal.type === "add-template-exercise" ? modal.id : "";
+        modal = { type: "library-detail", name: el.getAttribute("data-name") || "", date: date, templateId: templateId || "", pickTemplate: false };
+        return render();
+      }
+      if (action === "library-add-workout") return addDetailToWorkout();
+      if (action === "library-add-template") return addDetailToTemplate(el.getAttribute("data-id") || "");
+      if (action === "photo-view") {
+        modal = { type: "photo-view", path: el.getAttribute("data-path") || "", src: el.getAttribute("data-src") || "" };
+        return render();
+      }
+      if (action === "photo-stock") {
+        modal = { type: "photo-view", path: "", src: el.getAttribute("data-src") || "" };
+        return render();
+      }
+      if (action === "photo-default") {
+        modal = { type: "photo-default", id: el.getAttribute("data-id") || "", path: el.getAttribute("data-path") || "" };
+        return render();
+      }
+      if (action === "photo-default-go") return clearOwnPhoto();
+      if (action === "photo-delete") {
+        modal = { type: "delete-photo", kind: el.getAttribute("data-kind") || "library", name: el.getAttribute("data-name") || "", path: el.getAttribute("data-path") || "" };
+        return render();
+      }
+      if (action === "photo-delete-go") return clearSharedPhoto();
       if (action === "history-delete-set") {
         modal = { type: "delete-set", id: el.getAttribute("data-id"), date: el.getAttribute("data-date") || "" };
         return render();
@@ -4829,6 +5197,7 @@
       try {
         await persistSetInsert(row, w);
         saving = false;
+        noteWorkoutTemplate();
         const ex = exerciseById(route.id);
         maybeStartRest(ex && ex.name);
         showToast("Set logged");
@@ -5497,6 +5866,7 @@
       try {
         await persistSetInsert(row, w);
         saving = false;
+        noteWorkoutTemplate();
         const ex = exerciseById(exId);
         maybeStartRest(ex && ex.name);
         showToast("Set logged");
@@ -5553,6 +5923,7 @@
     }
     async function finishWorkout() {
       if (!activeWorkout) return go("#/");
+      noteWorkoutTemplate();
       const finishedId = activeWorkout.templateId;
       state.lastTemplateId = finishedId;
       if (!demoMode) localStorage.setItem(lastTemplateKey(), finishedId || "");
@@ -6515,6 +6886,7 @@
       try {
         await persistSetInsert(row, w);
         saving = false;
+        noteWorkoutTemplate();
         const loggedEx = exerciseById(exId);
         maybeStartRest(loggedEx && loggedEx.name);
         showToast("Set " + (index + 1) + " logged");
@@ -6576,12 +6948,20 @@
       return !!(box && box.checked);
     }
     function renderExercisePicker() {
+      ensureCatalog();
       const workoutMode = modal.type === "add-workout-exercise";
+      const historyMode = modal.type === "add-history-exercise";
       const query = String(modal.query || "").trim().toLowerCase();
       let exclude = new Set();
       if (workoutMode && activeWorkout) {
         workoutItems().forEach(item => {
           const ex = exerciseById(item.exerciseId);
+          if (ex) exclude.add(ex.name.toLowerCase());
+        });
+      } else if (historyMode) {
+        const day = workoutHistory().find(item => item.date === modal.date) || { date: modal.date, exerciseIds: [] };
+        historyExerciseIds(day).forEach(id => {
+          const ex = exerciseById(id);
           if (ex) exclude.add(ex.name.toLowerCase());
         });
       } else {
@@ -6593,17 +6973,11 @@
         .filter(e => !query || e.name.toLowerCase().indexOf(query) !== -1)
         .sort((a, b) => a.name.localeCompare(b.name));
       const list = picks.map(e => `<button type="button" data-action="tpl-add-existing" data-name="${escapeHtml(e.name)}">${escapeHtml(e.name)}</button>`).join("");
-      const owned = new Set(state.exercises.map(e => e.name.toLowerCase()));
-      const libHits = LIBRARY.filter(e => {
-        const key = e.name.toLowerCase();
-        if (exclude.has(key) || owned.has(key)) return false;
-        if (query && key.indexOf(query) === -1) return false;
-        return true;
-      });
+      const libHits = catalogMatches(query).filter(e => !exclude.has(e.name.toLowerCase()));
       const libList = libraryMenus(libHits, {
         prefix: "pick:",
         force: !!query,
-        button: (e) => `<button type="button" data-action="tpl-add-library" data-name="${escapeHtml(e.name)}">${escapeHtml(e.name)}</button>`
+        button: (e) => `<button type="button" data-action="library-open" data-name="${escapeHtml(e.name)}">${escapeHtml(e.name)}</button>`
       });
       const also = workoutMode
         ? `<label class="also-save"><input type="checkbox" id="also-save-template" ${modal.alsoSave ? "checked" : ""}><span>Also save to template</span></label>`
@@ -6617,8 +6991,10 @@
           <div class="pick-list">
             <div class="pick-label">Yours</div>
             ${list || `<div class="picker-empty">${query ? "No matches in your list." : "No other exercises yet."}</div>`}
-            <div class="pick-label">Library</div>
-            ${libList || `<div class="picker-empty">${query ? "No library matches." : "Nothing left to add from the library."}</div>`}
+            <details class="lib-browse" data-browse="pick"${(query || modal.browseOpen) ? " open" : ""}>
+              <summary>Browse library</summary>
+              <div class="lib-browse-body">${libList || `<div class="picker-empty">${query ? "No library matches." : "Nothing to show."}</div>`}</div>
+            </details>
           </div>
           ${also}
           <label class="field-lbl" for="tpl-add-name">Create new exercise</label>
@@ -6631,6 +7007,7 @@
       </div>`;
     }
     function pickExistingExercise(name) {
+      if (modal && modal.type === "add-history-exercise") return addHistoryExercise(name);
       if (modal && modal.type === "add-workout-exercise") return addExerciseToWorkout(name, alsoSaveChecked());
       return addTemplateExercise(modal && modal.id, name);
     }
@@ -6638,6 +7015,7 @@
       const input = document.getElementById("tpl-add-name");
       const name = (input ? input.value : (modal && modal.value) || "").trim();
       if (!name) { showToast("Type an exercise name"); return; }
+      if (modal && modal.type === "add-history-exercise") return addHistoryExercise(name);
       if (modal && modal.type === "add-workout-exercise") return addExerciseToWorkout(name, alsoSaveChecked());
       try {
         const ex = await ensureExercise(name);
@@ -6702,7 +7080,8 @@
     function libraryEntry(name) {
       const key = String(name || "").trim().toLowerCase();
       if (!key) return null;
-      return LIBRARY.find(e => e.name.toLowerCase() === key) || null;
+      const list = catalog && catalog.length ? catalog : LIBRARY;
+      return list.find(e => e.name.toLowerCase() === key) || null;
     }
     function libraryMenus(matches, opts) {
       const prefix = opts.prefix || "";
@@ -6720,13 +7099,84 @@
         </details>`;
       }).join("");
     }
-    function renderLibrary() {
+    function catalogList() {
+      return catalog && catalog.length ? catalog : LIBRARY;
+    }
+    function ensureCatalog() {
+      if (catalog || catalogLoading) return;
+      catalogLoading = true;
+      fetch("library.json").then(res => {
+        if (!res.ok) throw new Error("library");
+        return res.json();
+      }).then(data => {
+        catalog = Array.isArray(data) ? data : [];
+        catalogLoading = false;
+        render();
+      }).catch(() => {
+        catalogLoading = false;
+        catalogError = true;
+        render();
+      });
+    }
+    function catalogMatches(query) {
+      const q = String(query || "").trim().toLowerCase();
+      return catalogList().filter(e => {
+        if (!q) return true;
+        const blob = [e.name, e.equipment, e.muscle, e.level, (e.primary || []).join(" "), (e.secondary || []).join(" "), (e.steps || []).join(" ")].join(" ").toLowerCase();
+        return blob.indexOf(q) !== -1;
+      });
+    }
+    function userExerciseByName(name) {
+      const key = String(name || "").trim().toLowerCase();
+      return state.exercises.find(e => e.name.toLowerCase() === key) || null;
+    }
+    function catalogImage(item) {
+      if (!item) return null;
+      const own = userExerciseByName(item.name);
+      if (own && own.photoPath) return { kind: "own", path: own.photoPath };
+      const shared = libraryPhotos[String(item.name || "").toLowerCase()];
+      if (shared) return { kind: "shared", path: shared };
+      if (item.image) return { kind: "stock", src: item.image };
+      return null;
+    }
+    function queuePhotoUrl(path) {
+      if (!path || photoUrls[path] || photoPending[path] || photoFailed[path] || String(path).indexOf("demo/") === 0) return;
+      if (demoMode || !sb || !sb.storage || typeof sb.storage.from !== "function") return;
+      photoPending[path] = true;
+      Promise.resolve(sb.storage.from("exercise-photos").createSignedUrl(path, 3600)).then(res => {
+        photoPending[path] = false;
+        if (res && res.data && res.data.signedUrl) {
+          photoUrls[path] = res.data.signedUrl;
+          render();
+        } else photoFailed[path] = true;
+      }).catch(() => { photoPending[path] = false; photoFailed[path] = true; });
+    }
+    function catalogThumb(img, label, openDetail) {
+      if (!img) return "";
+      if (img.kind === "stock") {
+        const action = openDetail ? "library-open" : "photo-stock";
+        const attr = openDetail ? `data-name="${escapeHtml(label)}"` : `data-src="${escapeHtml(img.src)}"`;
+        return `<button type="button" class="photo-thumb" data-action="${action}" ${attr} aria-label="View ${escapeHtml(label)}"><img src="${escapeHtml(img.src)}" alt=""></button>`;
+      }
+      const url = photoUrls[img.path] || "";
+      if (!url) { queuePhotoUrl(img.path); return `<div class="photo-thumb" aria-hidden="true"></div>`; }
+      return `<button type="button" class="photo-thumb" data-action="photo-view" data-path="${escapeHtml(img.path)}" aria-label="View photo of ${escapeHtml(label)}"><img src="${escapeHtml(url)}" alt=""></button>`;
+    }
+    function photoEditor(ex) {
+      const item = libraryEntry(ex.name) || { name: ex.name, image: "" };
+      const img = ex.photoPath ? { kind: "own", path: ex.photoPath } : catalogImage(item);
+      const thumb = img ? catalogThumb(img, ex.name, false) : "";
+      const file = `<label class="photo-file">${ex.photoPath ? "Replace photo" : "Add photo"}<input type="file" accept="image/*" data-photo="exercise" data-id="${escapeHtml(ex.id)}" data-name="${escapeHtml(ex.name)}"></label>`;
+      const revert = ex.photoPath ? `<button type="button" class="mini" data-action="photo-default" data-id="${escapeHtml(ex.id)}" data-path="${escapeHtml(ex.photoPath)}">Use default photo</button>` : "";
+      return `<div class="photo-row">${thumb}${file}${revert}</div>`;
+    }
+    function libraryBrowserBody() {
       const q = libQuery.trim().toLowerCase();
-      const matches = LIBRARY.filter(e => {
+      const matches = catalogList().filter(e => {
         if (libEquip !== "All" && e.equipment !== libEquip) return false;
         if (libMuscle !== "All" && e.muscle !== libMuscle) return false;
-        if (q && e.name.toLowerCase().indexOf(q) === -1) return false;
-        return true;
+        if (!q) return true;
+        return catalogMatches(q).some(hit => hit.name === e.name);
       });
       const equipChips = ["All"].concat(EQUIPMENT).map(name =>
         `<button type="button" class="chip${libEquip === name ? " on" : ""}" data-action="lib-equip" data-value="${escapeHtml(name)}">${escapeHtml(name)}</button>`
@@ -6739,24 +7189,80 @@
         force: !!q,
         listClass: "ex-list",
         button: (e) => {
-          const owned = state.exercises.some(x => x.name.toLowerCase() === e.name.toLowerCase());
-          return `<button type="button" class="ex-row" data-action="add-library" data-name="${escapeHtml(e.name)}">
-            <span class="meta"><span class="name">${escapeHtml(e.name)}</span><span class="last">${escapeHtml(e.muscle)}</span></span>
-            <span class="chev">${owned ? "Added" : "Add"}</span>
-          </button>`;
+          const img = catalogImage(e);
+          return `<div class="lib-entry">${catalogThumb(img, e.name, true)}<button type="button" class="ex-row" data-action="library-open" data-name="${escapeHtml(e.name)}">
+            <span class="meta"><span class="name">${escapeHtml(e.name)}</span><span class="last">${escapeHtml([e.muscle, e.level].filter(Boolean).join(" · "))}</span></span>
+            <span class="chev">View</span>
+          </button></div>`;
         }
       });
+      const waiting = !catalog && catalogLoading ? `<p class="photo-note">Loading the full library…</p>` : "";
+      const failed = catalogError && !catalog ? `<div class="empty">Couldn't load the full library. Showing the built-in list.</div>` : "";
+      return `<label class="field-lbl" for="lib-search">Search</label>
+        <input class="text-input" id="lib-search" type="search" placeholder="Search exercises" value="${escapeHtml(libQuery)}" aria-label="Search library">
+        <div class="chip-row" aria-label="Equipment">${equipChips}</div>
+        <div class="chip-row" aria-label="Muscle group">${muscleChips}</div>
+        <div class="lib-count">${matches.length} exercise${matches.length === 1 ? "" : "s"}</div>
+        ${waiting}${failed}
+        ${groups || `<div class="empty">No exercises match.</div>`}
+        <p class="photo-note">Exercise data and images from free-exercise-db (public domain).</p>`;
+    }
+    function renderBrowseLibrary(which) {
+      ensureCatalog();
+      const q = libQuery.trim().toLowerCase();
+      const open = (which === "home" ? homeLibOpen : libBrowseOpen) || !!q;
+      return `<details class="lib-browse" data-browse="${which}"${open ? " open" : ""}>
+        <summary>Browse library</summary>
+        <div class="lib-browse-body">${libraryBrowserBody()}</div>
+      </details>`;
+    }
+    function renderLibraryDetail() {
+      const item = libraryEntry(modal.name) || { name: modal.name, equipment: "", muscle: "", level: "", primary: [], secondary: [], steps: [], image: "" };
+      const img = catalogImage(item);
+      let picture = "";
+      if (img && img.kind === "stock") picture = `<img class="photo-view" src="${escapeHtml(img.src)}" alt="${escapeHtml(item.name)}">`;
+      else if (img && photoUrls[img.path]) picture = `<img class="photo-view" src="${escapeHtml(photoUrls[img.path])}" alt="${escapeHtml(item.name)}">`;
+      else if (img) { queuePhotoUrl(img.path); picture = `<div class="photo-thumb" aria-hidden="true"></div>`; }
+      const muscles = (list, label) => list && list.length ? `<p class="hint"><strong>${label}.</strong> ${escapeHtml(list.join(", "))}</p>` : "";
+      const steps = (item.steps || []).map((step, i) => `<li>${escapeHtml(step)}</li>`).join("");
+      const own = userExerciseByName(item.name);
+      const ownPath = own && own.photoPath ? own.photoPath : "";
+      const myPhoto = `<label class="photo-file">${ownPath ? "Replace my photo" : "Use my photo"}<input type="file" accept="image/*" data-photo="exercise" data-id="${own ? escapeHtml(own.id) : ""}" data-name="${escapeHtml(item.name)}"></label>`;
+      const revert = ownPath ? `<button type="button" class="mini" data-action="photo-default" data-id="${escapeHtml(own.id)}" data-path="${escapeHtml(ownPath)}">Use default photo</button>` : "";
+      const admin = adminStats ? `<label class="photo-file">Set photo for everyone<input type="file" accept="image/*" data-photo="library" data-name="${escapeHtml(item.name)}"></label>` : "";
+      const shared = libraryPhotos[item.name.toLowerCase()];
+      const removeShared = adminStats && shared ? `<button type="button" class="mini danger" data-action="photo-delete" data-kind="library" data-name="${escapeHtml(item.name)}" data-path="${escapeHtml(shared)}">Remove shared photo</button>` : "";
+      const templates = modal.pickTemplate ? `<div class="pick-list">${(state.templates || []).map(t => `<button type="button" data-action="library-add-template" data-id="${escapeHtml(t.id)}">${escapeHtml(t.name)}</button>`).join("") || `<div class="picker-empty">No templates yet.</div>`}</div>` : "";
+      const templateBtn = modal.templateId
+        ? `<button type="button" class="btn primary" data-action="library-add-template" data-id="${escapeHtml(modal.templateId)}">Add to template</button>`
+        : `<button type="button" class="btn ghost" data-action="library-add-template">Add to template</button>`;
+      return `<div class="overlay" data-action="close-modal">
+        <div class="sheet sheet-scroll" role="dialog" aria-modal="true" aria-label="${escapeHtml(item.name)}">
+          <div class="grab"></div>
+          <h2>${escapeHtml(item.name)}</h2>
+          ${picture}
+          <p class="hint">${escapeHtml([item.equipment, item.level].filter(Boolean).join(" · "))}</p>
+          ${muscles(item.primary, "Primary")}
+          ${muscles(item.secondary, "Secondary")}
+          ${steps ? `<ol class="whats-new">${steps}</ol>` : `<p class="hint">No instructions for this one.</p>`}
+          <div class="photo-row">${myPhoto}${revert}${admin}${removeShared}</div>
+          <div class="sheet-actions">
+            <button type="button" class="btn primary" data-action="library-add-workout">Add to workout</button>
+            ${templateBtn}
+          </div>
+          ${templates}
+          <div class="sheet-actions"><button type="button" class="btn ghost" data-action="close-modal">Close</button></div>
+        </div>
+      </div>`;
+    }
+    function renderLibrary() {
+      ensureCatalog();
       return `<header class="topbar">
           <button class="icon-btn" data-go="#/" aria-label="Back">${backIcon()}</button>
           <h1>Library</h1>
         </header>
         <main class="screen">
-          <label class="field-lbl" for="lib-search">Search</label>
-          <input class="text-input" id="lib-search" type="search" placeholder="Search exercises" value="${escapeHtml(libQuery)}" aria-label="Search library">
-          <div class="chip-row" aria-label="Equipment">${equipChips}</div>
-          <div class="chip-row" aria-label="Muscle group">${muscleChips}</div>
-          <div class="lib-count">${matches.length} exercise${matches.length === 1 ? "" : "s"}</div>
-          ${groups || `<div class="empty">No exercises match.</div>`}
+          ${renderBrowseLibrary("page")}
         </main>`;
     }
     async function addFromLibrary(name) {
@@ -6772,6 +7278,185 @@
         showToast(ex.name + " added");
       } catch (err) {
         showToast(err.message || "Couldn't add that exercise.");
+      }
+    }
+    async function addDetailToWorkout() {
+      if (!modal) return;
+      if (modal.date) return addHistoryExercise(modal.name);
+      if (activeWorkout) return addExerciseToWorkout(modal.name, false);
+      try {
+        const ex = await ensureExercise(modal.name, true);
+        modal = null;
+        showToast(ex.name + " added");
+        go("#/exercise/" + encodeURIComponent(ex.id));
+      } catch (err) {
+        toastError(err, "Couldn't add that exercise.");
+      }
+    }
+    async function addDetailToTemplate(id) {
+      if (!modal) return;
+      const templateId = id || modal.templateId;
+      if (!templateId) {
+        modal.pickTemplate = true;
+        render();
+        return;
+      }
+      return addTemplateExercise(templateId, modal.name);
+    }
+    function photoSlug(name) {
+      return String(name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80) || "exercise";
+    }
+    function preparePhoto(file) {
+      return new Promise((resolve, reject) => {
+        if (!file || String(file.type || "").indexOf("image/") !== 0) {
+          reject(new Error("Choose a photo."));
+          return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          reject(new Error("Photos must be 5 MB or smaller."));
+          return;
+        }
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+          const scale = Math.min(1, 1200 / Math.max(img.width || 1, img.height || 1));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round((img.width || 1) * scale));
+          canvas.height = Math.max(1, Math.round((img.height || 1) * scale));
+          canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+          URL.revokeObjectURL(url);
+          canvas.toBlob(blob => {
+            if (!blob) { reject(new Error("Couldn't prepare that photo.")); return; }
+            if (blob.size > 5 * 1024 * 1024) { reject(new Error("That photo is still too large.")); return; }
+            resolve(blob);
+          }, "image/jpeg", 0.8);
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Couldn't read that photo.")); };
+        img.src = url;
+      });
+    }
+    function storageNotReady(err) {
+      const msg = String((err && (err.message || err.error)) || "").toLowerCase();
+      const code = String((err && (err.statusCode || err.status)) || "");
+      return code === "404" || msg.includes("bucket") || msg.includes("not found") || msg.includes("exercise-photos") || isMissingSchema(err);
+    }
+    async function loadLibraryPhotos() {
+      if (demoMode || !sb) return;
+      const res = await sb.from("library_photos").select("name,photo_path");
+      if (!res || res.error) return;
+      libraryPhotos = {};
+      (res.data || []).forEach(row => {
+        if (row && row.name && row.photo_path) libraryPhotos[String(row.name).toLowerCase()] = row.photo_path;
+      });
+    }
+    async function uploadPhoto(kind, file, meta) {
+      let blob;
+      try { blob = await preparePhoto(file); }
+      catch (err) { showToast(err.message || "Choose a photo."); return; }
+      const name = (meta && meta.name) || (modal && modal.name) || "";
+      if (kind === "library" && !adminStats) { showToast("Only an admin can set the shared photo."); return; }
+      if (demoMode) {
+        const path = "demo/" + (kind === "library" ? photoSlug(name) : (meta.id || photoSlug(name)));
+        photoUrls[path] = URL.createObjectURL(blob);
+        if (kind === "library") libraryPhotos[name.toLowerCase()] = path;
+        else {
+          let ex = meta.id ? exerciseById(meta.id) : userExerciseByName(name);
+          if (!ex) ex = await ensureExercise(name, true);
+          ex.photoPath = path;
+        }
+        showToast("Photo saved");
+        return;
+      }
+      if (!sb || !sb.storage || typeof sb.storage.from !== "function") {
+        showToast("Photo storage isn't set up yet.");
+        return;
+      }
+      try {
+        let path;
+        let ex = null;
+        if (kind === "library") path = "library/" + photoSlug(name) + ".jpg";
+        else {
+          ex = meta.id ? exerciseById(meta.id) : userExerciseByName(name);
+          if (!ex) ex = await ensureExercise(name, true);
+          path = session.user.id + "/" + ex.id + ".jpg";
+        }
+        const up = await sb.storage.from("exercise-photos").upload(path, blob, { upsert: true, contentType: "image/jpeg" });
+        if (up && up.error) {
+          if (storageNotReady(up.error)) { showToast("Photo storage isn't set up yet."); return; }
+          throw up.error;
+        }
+        if (kind === "library") {
+          const res = await sb.from("library_photos").upsert({ name: name, photo_path: path, updated_at: new Date().toISOString() }, { onConflict: "name" });
+          if (res.error) {
+            if (storageNotReady(res.error) || isMissingSchema(res.error)) { showToast("Photo storage isn't set up yet."); return; }
+            throw res.error;
+          }
+          libraryPhotos[name.toLowerCase()] = path;
+        } else {
+          const res = await sb.from("exercises").update({ photo_path: path }).eq("id", ex.id);
+          if (res.error) {
+            if (isMissingColumn(res.error) || isMissingSchema(res.error)) { showToast("Photo storage isn't set up yet."); return; }
+            throw res.error;
+          }
+          ex.photoPath = path;
+        }
+        delete photoUrls[path];
+        delete photoFailed[path];
+        showToast("Photo saved");
+      } catch (err) {
+        toastError(err, "Couldn't save that photo.");
+      }
+    }
+    async function clearOwnPhoto() {
+      if (!modal || modal.type !== "photo-default") return;
+      const id = modal.id;
+      const path = modal.path;
+      const ex = exerciseById(id);
+      const prev = ex ? ex.photoPath : "";
+      if (ex) ex.photoPath = "";
+      modal = null;
+      if (demoMode) {
+        delete photoUrls[path];
+        showToast("Using the default photo");
+        return;
+      }
+      try {
+        const res = await sb.from("exercises").update({ photo_path: null }).eq("id", id);
+        if (res.error) {
+          if (ex) ex.photoPath = prev;
+          if (isMissingColumn(res.error) || isMissingSchema(res.error)) { showToast("Photo storage isn't set up yet."); return; }
+          throw res.error;
+        }
+        if (path && sb.storage) await sb.storage.from("exercise-photos").remove([path]);
+        delete photoUrls[path];
+        showToast("Using the default photo");
+      } catch (err) {
+        if (ex) ex.photoPath = prev;
+        toastError(err, "Couldn't remove that photo.");
+      }
+    }
+    async function clearSharedPhoto() {
+      if (!modal || modal.type !== "delete-photo") return;
+      const name = modal.name;
+      const path = modal.path;
+      const key = String(name || "").toLowerCase();
+      const prev = libraryPhotos[key];
+      delete libraryPhotos[key];
+      modal = null;
+      if (demoMode) { showToast("Shared photo removed"); return; }
+      try {
+        const res = await sb.from("library_photos").delete().eq("name", name);
+        if (res.error) {
+          if (prev) libraryPhotos[key] = prev;
+          if (storageNotReady(res.error) || isMissingSchema(res.error)) { showToast("Photo storage isn't set up yet."); return; }
+          throw res.error;
+        }
+        if (path && sb.storage) await sb.storage.from("exercise-photos").remove([path]);
+        delete photoUrls[path];
+        showToast("Shared photo removed");
+      } catch (err) {
+        if (prev) libraryPhotos[key] = prev;
+        toastError(err, "Couldn't remove that photo.");
       }
     }
     async function pickLibraryExercise(name) {

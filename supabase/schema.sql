@@ -13,6 +13,8 @@ create table if not exists public.exercises (
   constraint exercises_name_len check (char_length(btrim(name)) > 0 and char_length(name) <= 60)
 );
 
+alter table public.exercises add column if not exists photo_path text;
+
 create table if not exists public.sets (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,

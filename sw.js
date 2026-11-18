@@ -1,4 +1,4 @@
-const SHELL = "lift-log-shell-v17";
+const SHELL = "lift-log-shell-v18";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -29,7 +29,8 @@ self.addEventListener("fetch", (event) => {
     );
     return;
   }
-  if (!/\.(png|webmanifest)$/.test(path)) return;
+  const asset = /\.(png|jpe?g|webp|webmanifest)$/.test(path) || /\/library\.json$/.test(path);
+  if (!asset) return;
   event.respondWith(
     caches.match(req).then((hit) => hit || fetch(req).then((res) => {
       const copy = res.clone();
