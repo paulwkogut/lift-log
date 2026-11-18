@@ -15,6 +15,8 @@ If this browser still has a Lift Log from before accounts (`localStorage` key `l
 
 Admin stats are hidden until [`supabase/admin-stats.sql`](supabase/admin-stats.sql) is pasted in the SQL editor. That script adds `admin_stats()` and inserts paulwkogut@gmail.com into `app_admins`. Anyone else gets null, and Settings shows no Admin stats row.
 
+Exercise photos need [`supabase/exercise-photos.sql`](supabase/exercise-photos.sql) after the admin script. It adds a private Storage bucket and a library photo table. Until that is set up, adding a photo shows a toast and the rest of the app still works.
+
 Send feedback needs [`supabase/feedback.sql`](supabase/feedback.sql) and an Edge Function named `send-feedback`. The recipient address is only an Edge Function secret, not in this repo. Until that is set up, sending feedback shows an error and the rest of the app still works.
 
 Push / Pull / Legs templates are included. If you ran `supabase/schema.sql` before that feature, paste [`supabase/templates.sql`](supabase/templates.sql) in the SQL editor. Until that table exists, the app still offers the three built-in workouts and keeps template edits in this browser. Set targets (default 3×10) need [`supabase/sets-tracking.sql`](supabase/sets-tracking.sql) if `templates` already existed; without it, workouts still use 3×10.
