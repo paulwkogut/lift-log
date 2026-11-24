@@ -893,6 +893,39 @@
       line-height: 1;
     }
     .reorder-btn:active { background: var(--accent-dim); }
+    .reorder-btn:disabled { opacity: 0.35; }
+    .drag-handle {
+      width: 44px;
+      height: 44px;
+      margin-left: -6px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 12px;
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      touch-action: none;
+      cursor: grab;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
+    .drag-handle:active,
+    .tpl-row.dragging .drag-handle {
+      cursor: grabbing;
+      background: var(--accent-dim);
+      color: var(--accent-2);
+    }
+    body.tpl-dragging { touch-action: none; }
+    .tpl-row.dragging {
+      position: relative;
+      z-index: 3;
+      border-color: var(--accent);
+      background: var(--surface-2);
+      box-shadow: var(--shadow);
+    }
     .icon-x {
       width: 44px;
       height: 44px;
@@ -994,6 +1027,56 @@
     }
     .log-btn:disabled { opacity: 0.35; }
     .done-mark { margin-left: auto; color: var(--good); font-weight: 750; }
+    .logged-open {
+      flex: 1;
+      min-width: 0;
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 8px 4px 0;
+      border-radius: 14px;
+      text-align: left;
+    }
+    .logged-open .set-no { min-height: 44px; }
+    .logged-open .done-mark { margin-left: auto; }
+    .done-edit-label {
+      flex-shrink: 0;
+      min-width: 52px;
+      min-height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 10px;
+      border-radius: 12px;
+      background: var(--accent-dim);
+      color: var(--accent-2);
+      font-size: 14px;
+      font-weight: 800;
+    }
+    .logged-delete {
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .logged-editor { margin-top: 8px; }
+    .logged-editor .set-plan { margin-top: 0; }
+    .set-plan.done.editing { flex-wrap: nowrap; }
+    .logged-actions { display: flex; gap: 8px; margin-top: 8px; }
+    .logged-actions .log-btn { flex: 1; margin-left: 0; }
+    .logged-remove {
+      flex: 1;
+      min-height: 48px;
+      border-radius: 14px;
+      background: var(--danger-dim);
+      color: var(--danger);
+      font-weight: 800;
+      font-size: 17px;
+    }
     .add-extra {
       width: 100%;
       min-height: 44px;
@@ -1452,7 +1535,15 @@
       margin-bottom: 6px;
       min-height: 52px;
     }
-    .tpl-row .name { flex: 1; min-width: 0; font-weight: 650; }
+    .tpl-row .name {
+      flex: 1;
+      min-width: 0;
+      font-weight: 650;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tpl-order-hint { padding: 0 2px 10px; }
     .pick-list { display: flex; flex-direction: column; gap: 6px; max-height: 34vh; overflow: auto; margin-bottom: 12px; }
     .pick-list button {
       text-align: left;
@@ -1764,8 +1855,16 @@
       ["yellow", "Yellow", "#eab308"]
     ];
     let themeChoice = { mode: "dark", accent: "orange" };
-    const APP_VERSION = "1.18";
+    const APP_VERSION = "1.19";
     const RELEASE_NOTES = [
+      {
+        version: "1.19",
+        date: "November 24, 2026",
+        items: [
+          "In a template, drag the handle or tap the arrows to change the order of exercises. A workout you start uses that order.",
+          "During a workout, tap Edit on a set you already logged to change the weight and reps, or delete it."
+        ]
+      },
       {
         version: "1.18",
         date: "November 18, 2026",
@@ -1794,7 +1893,7 @@
       ["Workouts", "Start with Push, Pull, or Legs", "On Home, tap a workout card. After you finish, the next day moves to Pull, then Legs, then Push again.", "workouts"],
       ["Logging", "Log weight and reps", "Use the − and + steppers, then tap Log. A weight of 0 is bodyweight and shows as BW.", "log"],
       ["Rest", "Rest, then the next set", "A countdown starts after every logged set. Change it by 15 seconds, pause, or skip. When it ends, the screen flashes in your accent color.", "rest"],
-      ["Templates", "Make the workout yours", "Edit a template to rename, reorder, or remove exercises. Add from the library, or type a new name.", "template"],
+      ["Templates", "Make the workout yours", "Edit a template to rename it, drag the handle or tap the arrows to reorder exercises, or remove one. Add from the library, or type a new name.", "template"],
       ["History", "See what you lifted", "Open an exercise for each set, your bests, and a chart of top weight over time.", "history"],
       ["iPhone", "Add Lift Log to your Home Screen", "In Safari, tap Share, then Add to Home Screen. Lock-screen rest alerts only work from that icon.", "home"],
       ["Settings", "Tune it for this phone", "Change units, rest time, and the beep. Pick a theme and accent, keep the screen awake, or turn on lock-screen alerts.", "settings"]
@@ -1835,6 +1934,10 @@
     let catalogLoading = false;
     let catalogError = false;
     let historyDidSwipe = false;
+    let editingSetId = "";
+    let editingDraft = null;
+    let focusLoggedId = "";
+    let templateDrag = null;
     let demoMode = false;
     let demoBackup = null;
     let passwordDraft = { next: "", confirm: "" };
@@ -2575,7 +2678,18 @@
       return "home";
     }
 
+    function readLoggedDraft() {
+      if (!editingSetId) return;
+      const w = document.getElementById("logged-w-" + editingSetId);
+      const r = document.getElementById("logged-r-" + editingSetId);
+      if (!w && !r) return;
+      if (!editingDraft || editingDraft.id !== editingSetId) editingDraft = { id: editingSetId, weight: "", reps: "" };
+      if (w) editingDraft.weight = w.value;
+      if (r) editingDraft.reps = r.value;
+    }
     function render() {
+      if (templateDrag) return;
+      readLoggedDraft();
       const scrollY = window.scrollY;
       const active = document.activeElement;
       const activeId = active && active.id;
@@ -2641,6 +2755,11 @@
         window.scrollTo(0, scrollY);
       }
       syncScreenLock();
+      if (focusLoggedId) {
+        const loggedInput = document.getElementById("logged-w-" + focusLoggedId);
+        focusLoggedId = "";
+        if (loggedInput) loggedInput.focus();
+      }
       if (focusWorkoutId) {
         const target = document.getElementById("wo-" + focusWorkoutId);
         focusWorkoutId = "";
@@ -4246,7 +4365,7 @@
           <div class="sheet" role="dialog" aria-modal="true" aria-label="Finish workout">
             <div class="grab"></div>
             <h2>Finish ${escapeHtml(name)}?</h2>
-            <p class="hint">Logged sets stay in History. You can edit the weight and reps later.</p>
+            <p class="hint">Logged sets stay in History. Tap Edit on a set in this workout to change the weight and reps.</p>
             <div class="sheet-actions">
               <button type="button" class="btn ghost" data-action="close-modal">Cancel</button>
               <button type="button" class="btn primary" data-action="finish-workout-go">Finish workout</button>
@@ -4652,6 +4771,22 @@
           readPlan(id, index);
         });
       });
+      document.querySelectorAll("[data-logged-weight], [data-logged-reps]").forEach(input => {
+        selectField(input);
+        input.addEventListener("input", () => {
+          const id = input.getAttribute("data-logged-weight") || input.getAttribute("data-logged-reps");
+          if (!editingDraft || editingDraft.id !== id) editingDraft = { id, weight: "", reps: "" };
+          if (input.hasAttribute("data-logged-weight")) editingDraft.weight = input.value;
+          else editingDraft.reps = input.value;
+        });
+        input.addEventListener("keydown", (e) => {
+          if (e.key !== "Enter") return;
+          e.preventDefault();
+          const id = input.getAttribute("data-logged-weight") || input.getAttribute("data-logged-reps");
+          saveLoggedSet(id);
+        });
+      });
+      bindTemplateReorder();
       document.querySelectorAll("details.lib-drop").forEach(node => {
         node.addEventListener("toggle", () => {
           const key = node.getAttribute("data-group");
@@ -4867,6 +5002,8 @@
         modal = { type: "edit-set", id: el.getAttribute("data-id") };
         return render();
       }
+      if (action === "edit-logged-set") return beginLoggedEdit(el.getAttribute("data-id"));
+      if (action === "save-logged-set") return saveLoggedSet(el.getAttribute("data-id"));
       if (action === "save-set") return saveSetEdit();
       if (action === "delete-set") {
         modal = { type: "delete-set", id: el.getAttribute("data-id"), date: "" };
@@ -5213,31 +5350,67 @@
       }
     }
 
-    async function saveSetEdit() {
-      if (saving) return;
-      const s = state.sets.find(x => x.id === modal.id);
-      if (!s) return closeModal();
-      const w = parseWeight(document.getElementById("edit-weight").value);
-      const r = parseReps(document.getElementById("edit-reps").value);
-      if (w == null) { showToast("Enter a valid weight"); return; }
-      if (r == null) { showToast("Enter at least 1 rep"); return; }
-      const prevW = s.weightLbs;
-      const prevR = s.reps;
-      s.weightLbs = toLbs(w);
-      s.reps = r;
+    async function applySetEdit(set, displayWeight, reps) {
+      const prevW = set.weightLbs;
+      const prevR = set.reps;
+      set.weightLbs = toLbs(displayWeight);
+      set.reps = reps;
       saving = true;
       try {
-        await persistSetUpdate(s.id, w, r);
-        modal = null;
-        saving = false;
-        showToast("Set updated");
+        await persistSetUpdate(set.id, displayWeight, reps);
+        return true;
       } catch (err) {
-        s.weightLbs = prevW;
-        s.reps = prevR;
+        set.weightLbs = prevW;
+        set.reps = prevR;
         toastError(err, "Couldn't update that set.");
+        return false;
       } finally {
         saving = false;
       }
+    }
+    async function saveSetEdit() {
+      if (saving || !modal) return;
+      const s = state.sets.find(x => x.id === modal.id);
+      if (!s) return closeModal();
+      const weightEl = document.getElementById("edit-weight");
+      const repsEl = document.getElementById("edit-reps");
+      const w = parseWeight(weightEl ? weightEl.value : "");
+      const r = parseReps(repsEl ? repsEl.value : "");
+      if (w == null) { showToast("Enter a valid weight"); return; }
+      if (r == null) { showToast("Enter at least 1 rep"); return; }
+      const ok = await applySetEdit(s, w, r);
+      if (!ok) return;
+      modal = null;
+      showToast("Set updated");
+    }
+    function beginLoggedEdit(id) {
+      const s = state.sets.find(x => x.id === id);
+      if (!s || !activeWorkout) return;
+      editingSetId = id;
+      editingDraft = { id, weight: fmtWeight(s.weightLbs, false), reps: String(s.reps) };
+      focusLoggedId = id;
+      render();
+    }
+    async function saveLoggedSet(id) {
+      if (saving || !id) return;
+      readLoggedDraft();
+      const s = state.sets.find(x => x.id === id);
+      if (!s) {
+        editingSetId = "";
+        editingDraft = null;
+        render();
+        return;
+      }
+      const draft = editingDraft && editingDraft.id === id ? editingDraft : null;
+      const w = parseWeight(draft ? draft.weight : "");
+      const r = parseReps(draft ? draft.reps : "");
+      if (w == null) { showToast("Enter a valid weight"); return; }
+      if (r == null) { showToast("Enter at least 1 rep"); return; }
+      const ok = await applySetEdit(s, w, r);
+      if (!ok) return;
+      editingSetId = "";
+      editingDraft = null;
+      showToast("Set updated");
     }
 
     async function confirmDeleteSet() {
@@ -5252,6 +5425,10 @@
       if (saving) return;
       const backup = state.sets.slice();
       state.sets = state.sets.filter(s => s.id !== id);
+      if (editingSetId === id) {
+        editingSetId = "";
+        editingDraft = null;
+      }
       saving = true;
       try {
         await persistSetDelete(id);
@@ -5769,12 +5946,14 @@
       ensureTargets(t);
       const rows = t.exerciseNames.map((name, i) => {
         const target = t.targets[i];
-        return `<div class="tpl-row">
+        const upOff = i === 0 ? "disabled" : "";
+        const downOff = i === t.exerciseNames.length - 1 ? "disabled" : "";
+        return `<div class="tpl-row" data-index="${i}">
         <div class="tpl-line">
-          <span class="grip" aria-hidden="true"><i></i><i></i><i></i></span>
+          <button type="button" class="drag-handle" aria-grabbed="false" aria-label="Drag to reorder ${escapeHtml(name)}"><span class="grip" aria-hidden="true"><i></i><i></i><i></i></span></button>
           <span class="name">${escapeHtml(name)}</span>
-          <button type="button" class="reorder-btn" data-action="tpl-move" data-id="${escapeHtml(t.id)}" data-index="${i}" data-dir="-1" aria-label="Move ${escapeHtml(name)} up">↑</button>
-          <button type="button" class="reorder-btn" data-action="tpl-move" data-id="${escapeHtml(t.id)}" data-index="${i}" data-dir="1" aria-label="Move ${escapeHtml(name)} down">↓</button>
+          <button type="button" class="reorder-btn" data-action="tpl-move" data-id="${escapeHtml(t.id)}" data-index="${i}" data-dir="-1" aria-label="Move ${escapeHtml(name)} up" ${upOff}>↑</button>
+          <button type="button" class="reorder-btn" data-action="tpl-move" data-id="${escapeHtml(t.id)}" data-index="${i}" data-dir="1" aria-label="Move ${escapeHtml(name)} down" ${downOff}>↓</button>
           <button type="button" class="icon-x" data-action="tpl-remove" data-id="${escapeHtml(t.id)}" data-index="${i}" aria-label="Remove ${escapeHtml(name)}">×</button>
         </div>
         <div class="tpl-targets">
@@ -5808,7 +5987,10 @@
           <input class="text-input" id="tpl-name" maxlength="40" value="${escapeHtml(t.name)}">
           <button type="button" class="btn primary" data-action="save-template-name" style="width:100%;margin-bottom:16px">Save name</button>
           <div class="eyebrow">Exercises</div>
+          <p class="hint tpl-order-hint">Drag the handle, or tap the arrows, to change the order. A workout you start uses this order.</p>
+          <div id="tpl-exercises" data-id="${escapeHtml(t.id)}">
           ${rows || `<div class="empty">No exercises in this template yet.</div>`}
+          </div>
           ${del}
           <div class="finish-bar">
             <button type="button" class="add-set" data-action="tpl-add-open" data-id="${escapeHtml(t.id)}">+ Add exercise</button>
@@ -5913,6 +6095,8 @@
         };
         workoutDrafts = {};
         planDrafts = {};
+        editingSetId = "";
+        editingDraft = null;
         persistActive();
         saving = false;
         go("#/workout");
@@ -5935,6 +6119,8 @@
       }
       activeWorkout = null;
       workoutDrafts = {};
+      editingSetId = "";
+      editingDraft = null;
       persistActive();
       cacheTemplates();
       screenLockHold = false;
@@ -6008,30 +6194,126 @@
         showToast(err.message || "Couldn't save that template.");
       }
     }
-    async function moveTemplateExercise(id, index, dir) {
+    async function reorderTemplateExercises(id, from, to) {
       const t = templateById(id);
-      const i = parseInt(index, 10);
-      const delta = Number(dir);
-      if (!t || !Number.isFinite(i)) return;
-      const j = i + delta;
-      if (j < 0 || j >= t.exerciseNames.length) return;
+      const start = parseInt(from, 10);
+      const dest = parseInt(to, 10);
+      if (!t || !Number.isFinite(start) || !Number.isFinite(dest) || start === dest) return;
       ensureTargets(t);
-      const names = t.exerciseNames.slice();
-      const targets = t.targets.slice();
-      const swap = names[i];
-      names[i] = names[j];
-      names[j] = swap;
-      const swapTarget = targets[i];
-      targets[i] = targets[j];
-      targets[j] = swapTarget;
+      const n = t.exerciseNames.length;
+      if (start < 0 || dest < 0 || start >= n || dest >= n) return;
+      const prevNames = t.exerciseNames.slice();
+      const prevTargets = t.targets.map(item => ({ sets: item.sets, reps: item.reps }));
+      const names = prevNames.slice();
+      const targets = prevTargets.map(item => ({ sets: item.sets, reps: item.reps }));
+      const [name] = names.splice(start, 1);
+      const [target] = targets.splice(start, 1);
+      names.splice(dest, 0, name);
+      targets.splice(dest, 0, target);
       t.exerciseNames = names;
       t.targets = targets;
       try {
         await saveTemplateRecord(t);
         render();
       } catch (err) {
+        t.exerciseNames = prevNames;
+        t.targets = prevTargets;
         showToast(err.message || "Couldn't save that template.");
       }
+    }
+    async function moveTemplateExercise(id, index, dir) {
+      const i = parseInt(index, 10);
+      const delta = Number(dir);
+      if (!Number.isFinite(i) || !delta) return;
+      return reorderTemplateExercises(id, i, i + delta);
+    }
+    function bindTemplateReorder() {
+      const list = document.getElementById("tpl-exercises");
+      if (!list) return;
+      list.addEventListener("contextmenu", (e) => {
+        if (e.target.closest(".drag-handle")) e.preventDefault();
+      });
+      list.addEventListener("keydown", (e) => {
+        if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+        const handle = e.target.closest(".drag-handle");
+        if (!handle || !list.contains(handle)) return;
+        e.preventDefault();
+        const row = handle.closest(".tpl-row");
+        const index = [...list.querySelectorAll(".tpl-row")].indexOf(row);
+        moveTemplateExercise(list.getAttribute("data-id"), index, e.key === "ArrowUp" ? -1 : 1);
+      });
+      list.addEventListener("pointerdown", (e) => {
+        if (templateDrag) return;
+        if (e.button != null && e.button !== 0) return;
+        const handle = e.target.closest(".drag-handle");
+        if (!handle || !list.contains(handle)) return;
+        const row = handle.closest(".tpl-row");
+        if (!row) return;
+        e.preventDefault();
+        const from = [...list.querySelectorAll(".tpl-row")].indexOf(row);
+        templateDrag = { from, row, list, id: list.getAttribute("data-id"), pointerId: e.pointerId, lastY: e.clientY, scrollDir: 0, frame: 0 };
+        row.classList.add("dragging");
+        handle.setAttribute("aria-grabbed", "true");
+        document.body.classList.add("tpl-dragging");
+        try { handle.setPointerCapture(e.pointerId); } catch (err) {}
+        const place = (clientY) => {
+          if (!templateDrag || templateDrag.row !== row) return;
+          const others = [...list.querySelectorAll(".tpl-row")].filter(item => item !== row);
+          let before = null;
+          for (let i = 0; i < others.length; i++) {
+            const rect = others[i].getBoundingClientRect();
+            if (clientY < rect.top + rect.height / 2) { before = others[i]; break; }
+          }
+          if (before) {
+            if (row.nextElementSibling !== before) list.insertBefore(row, before);
+          } else if (list.lastElementChild !== row) {
+            list.appendChild(row);
+          }
+        };
+        const tick = () => {
+          if (!templateDrag || templateDrag.row !== row) return;
+          if (templateDrag.scrollDir) {
+            window.scrollBy(0, templateDrag.scrollDir);
+            place(templateDrag.lastY);
+          }
+          templateDrag.frame = requestAnimationFrame(tick);
+        };
+        const move = (ev) => {
+          if (!templateDrag || ev.pointerId !== templateDrag.pointerId) return;
+          if (ev.cancelable) ev.preventDefault();
+          templateDrag.lastY = ev.clientY;
+          const edge = 72;
+          if (ev.clientY < edge) templateDrag.scrollDir = -12;
+          else if (ev.clientY > window.innerHeight - edge) templateDrag.scrollDir = 12;
+          else templateDrag.scrollDir = 0;
+          place(ev.clientY);
+        };
+        const blockTouch = (ev) => {
+          if (templateDrag && ev.cancelable) ev.preventDefault();
+        };
+        const end = (ev) => {
+          if (!templateDrag || (ev && ev.pointerId != null && ev.pointerId !== templateDrag.pointerId)) return;
+          const drag = templateDrag;
+          templateDrag = null;
+          if (drag.frame) cancelAnimationFrame(drag.frame);
+          document.removeEventListener("pointermove", move);
+          document.removeEventListener("pointerup", end);
+          document.removeEventListener("pointercancel", end);
+          document.removeEventListener("touchmove", blockTouch);
+          document.body.classList.remove("tpl-dragging");
+          drag.row.classList.remove("dragging");
+          const grip = drag.row.querySelector(".drag-handle");
+          if (grip) grip.setAttribute("aria-grabbed", "false");
+          const to = [...drag.list.querySelectorAll(".tpl-row")].indexOf(drag.row);
+          if (drag.from >= 0 && to >= 0 && to !== drag.from) reorderTemplateExercises(drag.id, drag.from, to);
+          else render();
+        };
+        document.addEventListener("pointermove", move, { passive: false });
+        document.addEventListener("pointerup", end);
+        document.addEventListener("pointercancel", end);
+        document.addEventListener("touchmove", blockTouch, { passive: false });
+        templateDrag.frame = requestAnimationFrame(tick);
+      });
     }
     async function removeTemplateExercise(id, index) {
       const t = templateById(id);
@@ -6831,13 +7113,38 @@
       const planned = item.sets + (item.extra || 0);
       const logged = sessionSetsFor(id);
       const rows = [];
-      for (let i = 0; i < planned; i++) {
+      const slots = Math.max(planned, logged.length);
+      for (let i = 0; i < slots; i++) {
         const doneSet = logged[i];
+        if (i >= planned && !doneSet) continue;
         if (doneSet) {
-          rows.push(`<div class="set-plan done">
-            <span class="set-no">Set ${i + 1}</span>
-            <span class="done-mark">✓ ${escapeHtml(fmtWeight(doneSet.weightLbs, true))} × ${doneSet.reps}</span>
-          </div>`);
+          const weightLabel = fmtWeight(doneSet.weightLbs, true);
+          if (editingSetId === doneSet.id) {
+            const draft = editingDraft && editingDraft.id === doneSet.id
+              ? editingDraft
+              : { weight: fmtWeight(doneSet.weightLbs, false), reps: String(doneSet.reps) };
+            rows.push(`<div class="logged-editor">
+              <div class="set-plan done editing">
+                <span class="set-no">Set ${i + 1}</span>
+                <input class="plan-input" id="logged-w-${escapeHtml(doneSet.id)}" data-logged-weight="${escapeHtml(doneSet.id)}" inputmode="decimal" type="text" value="${escapeHtml(draft.weight)}" aria-label="Weight for set ${i + 1} of ${escapeHtml(name)}">
+                <span class="plan-x">×</span>
+                <input class="plan-input reps" id="logged-r-${escapeHtml(doneSet.id)}" data-logged-reps="${escapeHtml(doneSet.id)}" inputmode="numeric" type="text" value="${escapeHtml(draft.reps)}" aria-label="Reps for set ${i + 1} of ${escapeHtml(name)}">
+              </div>
+              <div class="logged-actions">
+                <button type="button" class="logged-remove" data-action="delete-set" data-id="${escapeHtml(doneSet.id)}" aria-label="Delete set ${i + 1} of ${escapeHtml(name)}">Delete</button>
+                <button type="button" class="log-btn" data-action="save-logged-set" data-id="${escapeHtml(doneSet.id)}">Save</button>
+              </div>
+            </div>`);
+          } else {
+            rows.push(`<div class="set-plan done">
+              <button type="button" class="logged-open" data-action="edit-logged-set" data-id="${escapeHtml(doneSet.id)}" aria-label="Edit set ${i + 1} of ${escapeHtml(name)}, ${escapeHtml(weightLabel)} by ${doneSet.reps}">
+                <span class="set-no">Set ${i + 1}</span>
+                <span class="done-mark">✓ ${escapeHtml(weightLabel)} × ${doneSet.reps}</span>
+                <span class="done-edit-label">Edit</span>
+              </button>
+              <button type="button" class="mini danger logged-delete" data-action="delete-set" data-id="${escapeHtml(doneSet.id)}" aria-label="Delete set ${i + 1} of ${escapeHtml(name)}">${trashIcon()}</button>
+            </div>`);
+          }
           continue;
         }
         const draft = ensurePlan(id, i, item.reps);
